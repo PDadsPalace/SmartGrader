@@ -651,9 +651,9 @@ export default function GradingWorkspace() {
 
     if (status === "loading" || loading) {
         return (
-            <div className="flex flex-col items-center justify-center min-h-screen bg-slate-50">
+            <div className="flex flex-col items-center justify-center min-h-screen bg-slate-50 dark:bg-slate-900">
                 <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-indigo-600 mb-4"></div>
-                <div className="animate-pulse text-indigo-900 font-medium">Loading Workspace...</div>
+                <div className="animate-pulse text-indigo-900 dark:text-indigo-300 font-medium">Loading Workspace...</div>
             </div>
         );
     }
@@ -661,23 +661,23 @@ export default function GradingWorkspace() {
     if (!session) return null;
 
     return (
-        <div className="h-screen bg-slate-50 flex flex-col overflow-hidden">
+        <div className="h-screen bg-slate-50 dark:bg-slate-900 flex flex-col overflow-hidden">
             {/* Header */}
-            <header className="h-16 flex-shrink-0 flex items-center justify-between px-6 bg-white border-b border-slate-200">
+            <header className="h-16 flex-shrink-0 flex items-center justify-between px-6 bg-white dark:bg-slate-950 border-b border-slate-200 dark:border-slate-800">
                 <div className="flex items-center gap-4">
                     <button
                         onClick={() => router.push(`/courses/${courseId}`)}
-                        className="p-2 rounded-lg hover:bg-slate-100 transition-colors text-slate-600 group flex-shrink-0"
+                        className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 dark:bg-slate-800 transition-colors text-slate-600 dark:text-slate-300 group flex-shrink-0"
                     >
                         <ArrowLeft className="w-5 h-5 group-hover:-translate-x-1 transition-transform" />
                     </button>
                     <div className="min-w-0">
-                        <h1 className="text-lg font-bold text-slate-900 leading-tight truncate px-1">{assignmentName || "Grading Workspace"}</h1>
-                        <p className="text-xs text-slate-500 truncate px-1">Assignment ID: {assignmentId}</p>
+                        <h1 className="text-lg font-bold text-slate-900 dark:text-slate-50 leading-tight truncate px-1">{assignmentName || "Grading Workspace"}</h1>
+                        <p className="text-xs text-slate-500 dark:text-slate-400 truncate px-1">Assignment ID: {assignmentId}</p>
                     </div>
                 </div>
                 <div className="flex items-center gap-3">
-                    <div className="bg-indigo-50 text-indigo-700 px-3 py-1 rounded-full text-sm font-semibold flex items-center gap-1.5">
+                    <div className="bg-indigo-50 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-400 px-3 py-1 rounded-full text-sm font-semibold flex items-center gap-1.5">
                         <Sparkles className="w-4 h-4" />
                         Gemini AI Ready
                     </div>
@@ -688,15 +688,15 @@ export default function GradingWorkspace() {
             <div className="flex-1 flex overflow-hidden">
 
                 {/* Left Panel: Roster & Submissions */}
-                <div className="w-1/3 flex flex-col border-r border-slate-200 bg-white z-10">
-                    <div className="p-4 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center">
-                        <h2 className="font-semibold text-slate-800 flex items-center gap-2">
-                            <User className="w-4 h-4 text-slate-500" />
+                <div className="w-1/3 flex flex-col border-r border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 z-10">
+                    <div className="p-4 border-b border-slate-100 dark:border-slate-800 bg-slate-50/50 flex justify-between items-center">
+                        <h2 className="font-semibold text-slate-800 dark:text-slate-200 flex items-center gap-2">
+                            <User className="w-4 h-4 text-slate-500 dark:text-slate-400" />
                             Student Submissions ({submissions.length})
                         </h2>
                         <div className="flex items-center gap-2">
                             {Object.keys(batchResults).length > 0 && (
-                                <div className="text-xs font-black px-3 py-1.5 rounded-lg bg-indigo-50 border border-indigo-200 text-indigo-700 mr-2 flex items-center gap-1.5 shadow-sm">
+                                <div className="text-xs font-black px-3 py-1.5 rounded-lg bg-indigo-50 dark:bg-indigo-900/40 border border-indigo-200 text-indigo-700 dark:text-indigo-400 mr-2 flex items-center gap-1.5 shadow-sm">
                                     <span className="opacity-70 font-semibold tracking-wider">AVG:</span>
                                     <span className="text-sm">
                                         {Math.round(Object.values(batchResults).reduce((sum, result) => {
@@ -707,12 +707,12 @@ export default function GradingWorkspace() {
                                 </div>
                             )}
                             {submissions.length > 0 && (
-                                <label className="flex items-center gap-1.5 text-xs font-semibold text-slate-700 cursor-pointer px-2 py-1.5 hover:bg-slate-100 rounded-lg transition-colors border border-slate-200 bg-white shadow-sm mr-2">
+                                <label className="flex items-center gap-1.5 text-xs font-semibold text-slate-700 dark:text-slate-300 cursor-pointer px-2 py-1.5 hover:bg-slate-100 dark:hover:bg-slate-800 dark:bg-slate-800 rounded-lg transition-colors border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 shadow-sm mr-2">
                                     <input
                                         type="checkbox"
                                         checked={generateFeedback}
                                         onChange={(e) => setGenerateFeedback(e.target.checked)}
-                                        className="w-3.5 h-3.5 text-indigo-600 rounded border-slate-300 focus:ring-indigo-500"
+                                        className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400 rounded border-slate-300 dark:border-slate-700 focus:ring-indigo-500"
                                     />
                                     Generate Feedback Note
                                 </label>
@@ -720,7 +720,7 @@ export default function GradingWorkspace() {
                             {submissions.length > 0 && Object.keys(batchResults).length > 0 && (
                                 <button
                                     onClick={handleExportCSV}
-                                    className="text-xs bg-emerald-100 text-emerald-700 hover:bg-emerald-200 px-3 py-1.5 rounded-lg font-bold flex items-center gap-1.5 transition-colors"
+                                    className="text-xs bg-emerald-100 dark:bg-emerald-900/60 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-200 px-3 py-1.5 rounded-lg font-bold flex items-center gap-1.5 transition-colors"
                                 >
                                     <Download className="w-3.5 h-3.5" /> Export CSV
                                 </button>
@@ -742,7 +742,7 @@ export default function GradingWorkspace() {
                                 batchGrading ? (
                                     <button
                                         onClick={() => { stopGradingRef.current = true; }}
-                                        className="text-xs bg-red-100 text-red-700 hover:bg-red-200 px-3 py-1.5 rounded-lg font-bold flex items-center gap-1.5 transition-colors"
+                                        className="text-xs bg-red-100 text-red-700 dark:text-red-400 hover:bg-red-200 px-3 py-1.5 rounded-lg font-bold flex items-center gap-1.5 transition-colors"
                                     >
                                         <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-red-700"></div> Stop Grading
                                     </button>
@@ -760,7 +760,7 @@ export default function GradingWorkspace() {
                                         <button
                                             onClick={() => handleGradeAll(false)}
                                             disabled={loading}
-                                            className="text-xs bg-indigo-100 text-indigo-700 hover:bg-indigo-200 px-3 py-1.5 rounded-lg font-bold flex items-center gap-1.5 transition-colors disabled:opacity-50"
+                                            className="text-xs bg-indigo-100 dark:bg-indigo-900/60 text-indigo-700 dark:text-indigo-400 hover:bg-indigo-200 px-3 py-1.5 rounded-lg font-bold flex items-center gap-1.5 transition-colors disabled:opacity-50"
                                         >
                                             <ListChecks className="w-3.5 h-3.5" /> {Object.keys(batchResults).length > 0 ? "Grade Remaining" : "Grade All"}
                                         </button>
@@ -771,7 +771,7 @@ export default function GradingWorkspace() {
                     </div>
                     <div className="flex-1 overflow-y-auto p-3 space-y-2">
                         {submissions.length === 0 ? (
-                            <div className="text-center p-6 text-slate-500 text-sm">No submissions found for this assignment yet.</div>
+                            <div className="text-center p-6 text-slate-500 dark:text-slate-400 text-sm">No submissions found for this assignment yet.</div>
                         ) : (
                             submissions.map((sub) => (
                                 <div
@@ -784,7 +784,7 @@ export default function GradingWorkspace() {
                                         const savedFloor = localStorage.getItem(`student_floor_${sub.userId}`);
                                         setStudentGradeFloor(savedFloor || "");
                                     }}
-                                    className={`relative p-4 rounded-xl cursor-pointer border transition-all ${selectedSubmission?.id === sub.id ? 'border-indigo-500 bg-indigo-50 shadow-sm' : 'border-slate-100 hover:border-slate-300 hover:bg-slate-50'}`}
+                                    className={`relative p-4 rounded-xl cursor-pointer border transition-all ${selectedSubmission?.id === sub.id ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-900/40 shadow-sm' : 'border-slate-100 dark:border-slate-800 hover:border-slate-300 dark:border-slate-700 hover:bg-slate-50'}`}
                                 >
                                     {batchResults[sub.id] && (
                                         <div className="absolute top-0 right-0 -mt-2 -mr-2 bg-indigo-500 text-white px-2 py-0.5 min-w-[1.5rem] rounded-full flex items-center justify-center shadow-sm border-2 border-white text-xs font-bold z-10">
@@ -792,12 +792,12 @@ export default function GradingWorkspace() {
                                         </div>
                                     )}
                                     <div className="flex justify-between items-start mb-1">
-                                        <span className="font-semibold text-slate-900">{sub.studentProfile?.name?.fullName || "Student Name"}</span>
+                                        <span className="font-semibold text-slate-900 dark:text-slate-50">{sub.studentProfile?.name?.fullName || "Student Name"}</span>
                                         {sub.state === "TURNED_IN" && (
                                             <span className="text-[10px] uppercase tracking-wider font-bold bg-green-100 text-green-700 px-2 py-0.5 rounded-full">Submitted</span>
                                         )}
                                     </div>
-                                    <div className="flex items-center gap-1.5 text-xs text-slate-500 mb-2">
+                                    <div className="flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400 mb-2">
                                         <FileText className="w-3 h-3" />
                                         {sub.assignmentSubmission?.attachments?.length || 0} Attachments
                                     </div>
@@ -806,7 +806,7 @@ export default function GradingWorkspace() {
                                     <div className="flex flex-wrap gap-2">
                                         {sub.assignmentSubmission?.attachments?.map((att, i) => (
                                             att.driveFile?.thumbnailUrl && (
-                                                <div key={i} className="flex-1 min-w-[30%] max-w-[80px] bg-slate-100 rounded border border-slate-200 overflow-hidden shadow-sm aspect-video relative">
+                                                <div key={i} className="flex-1 min-w-[30%] max-w-[80px] bg-slate-100 dark:bg-slate-800 rounded border border-slate-200 dark:border-slate-800 overflow-hidden shadow-sm aspect-video relative">
                                                     <a href={att.driveFile?.alternateLink || "#"} target="_blank" rel="noopener noreferrer">
                                                         <img
                                                             src={`/api/drive/thumbnail?url=${encodeURIComponent(att.driveFile.thumbnailUrl)}`}
@@ -827,7 +827,7 @@ export default function GradingWorkspace() {
                 {/* Right Panel: Grading & AI */}
                 <div className="flex-1 flex flex-col bg-slate-50/50 overflow-y-auto relative">
                     {error ? (
-                        <div className="m-8 p-4 bg-red-50 text-red-700 rounded-xl border border-red-200">{error}</div>
+                        <div className="m-8 p-4 bg-red-50 dark:bg-red-900/30 text-red-700 dark:text-red-400 rounded-xl border border-red-200 dark:border-red-800">{error}</div>
                     ) : !selectedSubmission ? (
                         <div className="flex-1 flex items-center justify-center text-slate-400 flex-col gap-3">
                             <FileText className="w-12 h-12 opacity-50" />
@@ -837,38 +837,38 @@ export default function GradingWorkspace() {
                         <div className="p-8 max-w-4xl mx-auto w-full space-y-8 pb-24">
 
                             {/* Submission Content Area */}
-                            <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
-                                <h3 className="text-lg font-bold border-b border-slate-100 pb-3 mb-4 flex justify-between items-center text-slate-900">
+                            <div className="bg-white dark:bg-slate-950 p-6 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-800">
+                                <h3 className="text-lg font-bold border-b border-slate-100 dark:border-slate-800 pb-3 mb-4 flex justify-between items-center text-slate-900 dark:text-slate-50">
                                     {selectedSubmission.studentProfile?.name?.fullName}'s Work
                                 </h3>
 
                                 {contentLoading ? (
-                                    <div className="flex items-center gap-3 text-slate-500 justify-center p-8 bg-slate-50 rounded-xl border border-slate-200">
+                                    <div className="flex items-center gap-3 text-slate-500 dark:text-slate-400 justify-center p-8 bg-slate-50 dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800">
                                         <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-indigo-600"></div>
                                         Fetching Document from Drive...
                                     </div>
                                 ) : submissionIsBinary ? (
-                                    <div className="bg-indigo-50 p-6 rounded-xl text-center border border-indigo-100 shadow-inner my-4">
-                                        <h4 className="font-bold text-indigo-900 mb-2 text-xl">Spreadsheet / Binary File Attached</h4>
-                                        <p className="text-sm text-indigo-700 max-w-md mx-auto">This file has been securely imported as a binary document to preserve its formulas and formatting. You cannot preview it here, but it will be safely sent directly to Gemini when you generate the grade.</p>
+                                    <div className="bg-indigo-50 dark:bg-indigo-900/40 p-6 rounded-xl text-center border border-indigo-100 shadow-inner my-4">
+                                        <h4 className="font-bold text-indigo-900 dark:text-indigo-300 mb-2 text-xl">Spreadsheet / Binary File Attached</h4>
+                                        <p className="text-sm text-indigo-700 dark:text-indigo-400 max-w-md mx-auto">This file has been securely imported as a binary document to preserve its formulas and formatting. You cannot preview it here, but it will be safely sent directly to Gemini when you generate the grade.</p>
                                     </div>
                                 ) : (
-                                    <div className="bg-slate-50 p-6 rounded-xl text-sm text-slate-800 font-serif border border-slate-200 shadow-inner max-h-96 overflow-y-auto whitespace-pre-wrap leading-relaxed">
+                                    <div className="bg-slate-50 dark:bg-slate-900 p-6 rounded-xl text-sm text-slate-800 dark:text-slate-200 font-serif border border-slate-200 dark:border-slate-800 shadow-inner max-h-96 overflow-y-auto whitespace-pre-wrap leading-relaxed">
                                         {submissionContent}
                                     </div>
                                 )}
                             </div>
 
                             {/* AI Grading Controls */}
-                            <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 space-y-6">
-                                <h3 className="text-lg font-bold border-b border-slate-100 pb-3 flex items-center gap-2 text-slate-900">
-                                    <Settings2 className="w-5 h-5 text-indigo-600" />
+                            <div className="bg-white dark:bg-slate-950 p-6 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-800 space-y-6">
+                                <h3 className="text-lg font-bold border-b border-slate-100 dark:border-slate-800 pb-3 flex items-center gap-2 text-slate-900 dark:text-slate-50">
+                                    <Settings2 className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
                                     AI Grading Controls
                                 </h3>
 
                                 <div className="space-y-4">
                                     <div>
-                                        <label className="block text-sm font-semibold text-slate-700 mb-2">Grading Strictness</label>
+                                        <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">Grading Strictness</label>
                                         <div className="flex items-center gap-4">
                                             <span className="text-xs font-medium text-green-600 bg-green-50 px-2 py-1 rounded">Easy (1)</span>
                                             <input
@@ -878,16 +878,16 @@ export default function GradingWorkspace() {
                                                 onChange={(e) => setStrictness(parseInt(e.target.value))}
                                                 className="flex-1 accent-indigo-600 h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer"
                                             />
-                                            <span className="text-xs font-medium text-red-600 bg-red-50 px-2 py-1 rounded">Hard (10)</span>
+                                            <span className="text-xs font-medium text-red-600 bg-red-50 dark:bg-red-900/30 px-2 py-1 rounded">Hard (10)</span>
                                         </div>
-                                        <div className="text-center text-sm font-bold text-indigo-700 mt-2 mb-4">Level: {strictness}</div>
+                                        <div className="text-center text-sm font-bold text-indigo-700 dark:text-indigo-400 mt-2 mb-4">Level: {strictness}</div>
 
-                                        <label className="flex items-center gap-2 text-sm font-semibold text-slate-700 cursor-pointer p-2 hover:bg-slate-50 rounded-lg transition-colors border border-transparent hover:border-slate-200">
+                                        <label className="flex items-center gap-2 text-sm font-semibold text-slate-700 dark:text-slate-300 cursor-pointer p-2 hover:bg-slate-50 dark:bg-slate-900 rounded-lg transition-colors border border-transparent hover:border-slate-200 dark:border-slate-800">
                                             <input
                                                 type="checkbox"
                                                 checked={generateFeedback}
                                                 onChange={(e) => setGenerateFeedback(e.target.checked)}
-                                                className="w-4 h-4 text-indigo-600 rounded border-slate-300 focus:ring-indigo-500"
+                                                className="w-4 h-4 text-indigo-600 dark:text-indigo-400 rounded border-slate-300 dark:border-slate-700 focus:ring-indigo-500"
                                             />
                                             Generate AI Feedback Note for Student
                                         </label>
@@ -896,7 +896,7 @@ export default function GradingWorkspace() {
                                     <div>
                                         <div className="flex gap-4">
                                             <div className="flex-1">
-                                                <label className="block text-sm font-semibold text-slate-700 mb-2">Student-Specific Context</label>
+                                                <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">Student-Specific Context</label>
                                                 <textarea
                                                     value={studentNotes}
                                                     onChange={(e) => {
@@ -904,11 +904,11 @@ export default function GradingWorkspace() {
                                                         localStorage.setItem(`student_notes_${selectedSubmission.userId}`, e.target.value);
                                                     }}
                                                     placeholder="e.g. Needs easier grading because they are ELL..."
-                                                    className="w-full h-20 p-3 text-sm border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none resize-y bg-yellow-50/30 text-slate-800 placeholder:text-slate-400"
+                                                    className="w-full h-20 p-3 text-sm border border-slate-200 dark:border-slate-800 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none resize-y bg-yellow-50/30 text-slate-800 dark:text-slate-200 placeholder:text-slate-400"
                                                 ></textarea>
                                             </div>
                                             <div className="w-32">
-                                                <label className="block text-sm font-semibold text-slate-700 mb-2">Grade Floor</label>
+                                                <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">Grade Floor</label>
                                                 <input
                                                     type="number"
                                                     value={studentGradeFloor}
@@ -917,7 +917,7 @@ export default function GradingWorkspace() {
                                                         localStorage.setItem(`student_floor_${selectedSubmission.userId}`, e.target.value);
                                                     }}
                                                     placeholder="e.g. 50"
-                                                    className="w-full h-20 p-3 text-center text-xl font-black border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none bg-indigo-50/50 text-indigo-700 placeholder:text-indigo-300 placeholder:font-normal placeholder:text-sm"
+                                                    className="w-full h-20 p-3 text-center text-xl font-black border border-slate-200 dark:border-slate-800 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none bg-indigo-50/50 text-indigo-700 dark:text-indigo-400 placeholder:text-indigo-300 placeholder:font-normal placeholder:text-sm"
                                                 />
                                             </div>
                                         </div>
@@ -925,7 +925,7 @@ export default function GradingWorkspace() {
 
                                     <div>
                                         <div className="flex justify-between items-end mb-2">
-                                            <label className="block text-sm font-semibold text-slate-700">Answer Key / Rubric</label>
+                                            <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300">Answer Key / Rubric</label>
                                             <div className="relative">
                                                 <input
                                                     type="file"
@@ -933,7 +933,7 @@ export default function GradingWorkspace() {
                                                     onChange={handleFileChange}
                                                     className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
                                                 />
-                                                <button type="button" className="text-xs bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 py-1.5 rounded-lg flex items-center gap-1.5 font-medium border border-slate-300 transition-colors">
+                                                <button type="button" className="text-xs bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 px-3 py-1.5 rounded-lg flex items-center gap-1.5 font-medium border border-slate-300 dark:border-slate-700 transition-colors">
                                                     <FileText className="w-3.5 h-3.5" />
                                                     {rubricFile ? rubricFile.name : "Upload File (PDF/Image)"}
                                                 </button>
@@ -943,7 +943,7 @@ export default function GradingWorkspace() {
                                             value={rubric}
                                             onChange={(e) => setRubric(e.target.value)}
                                             placeholder="Paste the grading rubric or correct answers here, or upload a file above..."
-                                            className="w-full h-32 p-3 text-sm border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none resize-y text-slate-800 placeholder:text-slate-400"
+                                            className="w-full h-32 p-3 text-sm border border-slate-200 dark:border-slate-800 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none resize-y text-slate-800 dark:text-slate-200 placeholder:text-slate-400"
                                         ></textarea>
                                     </div>
 
@@ -963,10 +963,10 @@ export default function GradingWorkspace() {
 
                             {/* AI Feedback Results */}
                             {aiFeedback && (
-                                <div className="bg-indigo-50 p-6 rounded-2xl border border-indigo-100 animate-in slide-in-from-bottom-4 duration-300 relative overflow-hidden">
+                                <div className="bg-indigo-50 dark:bg-indigo-900/40 p-6 rounded-2xl border border-indigo-100 animate-in slide-in-from-bottom-4 duration-300 relative overflow-hidden">
                                     <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-200 rounded-full blur-3xl opacity-30 -mr-10 -mt-10 pointer-events-none"></div>
                                     <div className="flex justify-between items-start mb-4 relative z-10">
-                                        <h3 className="font-bold text-indigo-900 border-b border-indigo-200/50 pb-2 w-full flex items-center justify-between gap-2">
+                                        <h3 className="font-bold text-indigo-900 dark:text-indigo-300 border-b border-indigo-200/50 pb-2 w-full flex items-center justify-between gap-2">
                                             <div className="flex items-center gap-2">
                                                 <CheckCircle2 className="w-5 h-5" />
                                                 AI Evaluation Result
@@ -992,7 +992,7 @@ export default function GradingWorkspace() {
                                                         }
                                                     }));
                                                 }}
-                                                className="text-3xl font-black text-indigo-700 bg-white border border-indigo-200 focus:border-indigo-600 focus:ring-2 focus:ring-indigo-200 outline-none w-24 rounded-lg text-center shadow-sm py-1"
+                                                className="text-3xl font-black text-indigo-700 dark:text-indigo-400 bg-white dark:bg-slate-950 border border-indigo-200 focus:border-indigo-600 focus:ring-2 focus:ring-indigo-200 outline-none w-24 rounded-lg text-center shadow-sm py-1"
                                             />
                                             <div className="flex flex-col gap-1 text-indigo-500">
                                                 <button onClick={() => {
@@ -1007,7 +1007,7 @@ export default function GradingWorkspace() {
                                                             feedback: prev[selectedSubmission.id]?.feedback || aiFeedback.feedback
                                                         }
                                                     }));
-                                                }} className="hover:bg-indigo-100 hover:text-indigo-700 bg-white border border-indigo-100 shadow-sm rounded p-1 transition-colors leading-none font-bold text-lg px-2">▲</button>
+                                                }} className="hover:bg-indigo-100 dark:bg-indigo-900/60 hover:text-indigo-700 dark:text-indigo-400 bg-white dark:bg-slate-950 border border-indigo-100 shadow-sm rounded p-1 transition-colors leading-none font-bold text-lg px-2">▲</button>
                                                 <button onClick={() => {
                                                     const current = parseFloat(aiFeedback.grade) || 0;
                                                     const updated = String(Math.max(0, current - 1));
@@ -1020,14 +1020,14 @@ export default function GradingWorkspace() {
                                                             feedback: prev[selectedSubmission.id]?.feedback || aiFeedback.feedback
                                                         }
                                                     }));
-                                                }} className="hover:bg-indigo-100 hover:text-indigo-700 bg-white border border-indigo-100 shadow-sm rounded p-1 transition-colors leading-none font-bold text-lg px-2">▼</button>
+                                                }} className="hover:bg-indigo-100 dark:bg-indigo-900/60 hover:text-indigo-700 dark:text-indigo-400 bg-white dark:bg-slate-950 border border-indigo-100 shadow-sm rounded p-1 transition-colors leading-none font-bold text-lg px-2">▼</button>
                                             </div>
                                         </div>
                                     </div>
 
                                     <div className="relative z-10">
                                         <span className="text-xs uppercase tracking-wider font-bold text-indigo-500 mb-2 block">Feedback to Student</span>
-                                        <div className="bg-white p-4 rounded-xl text-sm text-slate-700 whitespace-pre-wrap shadow-sm border border-indigo-100/50">
+                                        <div className="bg-white dark:bg-slate-950 p-4 rounded-xl text-sm text-slate-700 dark:text-slate-300 whitespace-pre-wrap shadow-sm border border-indigo-100/50">
                                             {aiFeedback.feedback}
                                         </div>
                                     </div>
@@ -1041,36 +1041,36 @@ export default function GradingWorkspace() {
             {/* PowerSchool Map Interceptor Modal */}
             {showRosterModal && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm animate-in fade-in duration-200">
-                    <div className="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden animate-in zoom-in-95 duration-200">
-                        <div className="px-6 py-4 border-b border-slate-200 flex justify-between items-center bg-indigo-50/50">
-                            <h2 className="text-lg font-bold text-indigo-900 flex items-center gap-2">
-                                <ListChecks className="w-5 h-5 text-indigo-600" />
+                    <div className="bg-white dark:bg-slate-950 rounded-2xl shadow-xl w-full max-w-md overflow-hidden animate-in zoom-in-95 duration-200">
+                        <div className="px-6 py-4 border-b border-slate-200 dark:border-slate-800 flex justify-between items-center bg-indigo-50/50">
+                            <h2 className="text-lg font-bold text-indigo-900 dark:text-indigo-300 flex items-center gap-2">
+                                <ListChecks className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
                                 Roster Mapping Required
                             </h2>
-                            <button onClick={() => setShowRosterModal(false)} className="text-slate-400 hover:text-slate-600 p-1 rounded-lg transition-colors hover:bg-slate-100">
+                            <button onClick={() => setShowRosterModal(false)} className="text-slate-400 hover:text-slate-600 dark:text-slate-300 p-1 rounded-lg transition-colors hover:bg-slate-100 dark:hover:bg-slate-800 dark:bg-slate-800">
                                 <X className="w-5 h-5" />
                             </button>
                         </div>
 
-                        <div className="p-6 space-y-4 text-sm text-slate-700">
+                        <div className="p-6 space-y-4 text-sm text-slate-700 dark:text-slate-300">
                             <div className="flex items-start gap-3 p-3 bg-amber-50 text-amber-800 rounded-lg border border-amber-200/50">
                                 <AlertTriangle className="w-5 h-5 flex-shrink-0 mt-0.5 text-amber-600" />
                                 <p>
-                                    To export an <strong>exact PowerSchool CSV</strong>, AutoGrader needs to learn how to map Google Classroom names to your PowerSchool Student Numbers.
+                                    To export an <strong>exact PowerSchool CSV</strong>, SmartGrader needs to learn how to map Google Classroom names to your PowerSchool Student Numbers.
                                 </p>
                             </div>
-                            <p className="font-medium text-slate-900">
+                            <p className="font-medium text-slate-900 dark:text-slate-50">
                                 Please upload one standard PowerSchool Export CSV for this specific class. You only need to do this once per class!
                             </p>
 
                             {rosterSetupError && (
-                                <div className="p-3 bg-red-50 text-red-600 border border-red-200 rounded-lg text-sm font-semibold">
+                                <div className="p-3 bg-red-50 dark:bg-red-900/30 text-red-600 border border-red-200 dark:border-red-800 rounded-lg text-sm font-semibold">
                                     {rosterSetupError}
                                 </div>
                             )}
 
-                            <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-slate-300 border-dashed rounded-xl cursor-pointer bg-slate-50 hover:bg-indigo-50 hover:border-indigo-300 transition-colors group relative overflow-hidden">
-                                <div className="flex flex-col items-center justify-center pt-5 pb-6 text-slate-500 group-hover:text-indigo-600 transition-colors z-10 p-4 text-center">
+                            <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-slate-300 dark:border-slate-700 border-dashed rounded-xl cursor-pointer bg-slate-50 dark:bg-slate-900 hover:bg-indigo-50 dark:bg-indigo-900/40 hover:border-indigo-300 transition-colors group relative overflow-hidden">
+                                <div className="flex flex-col items-center justify-center pt-5 pb-6 text-slate-500 dark:text-slate-400 group-hover:text-indigo-600 dark:text-indigo-400 transition-colors z-10 p-4 text-center">
                                     <UploadCloud className="w-8 h-8 mb-2" />
                                     <p className="mb-1 text-sm font-bold">Select Roster CSV</p>
                                     <p className="text-xs text-slate-400 group-hover:text-indigo-400">Must be a direct PowerSchool export</p>

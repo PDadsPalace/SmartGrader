@@ -13,15 +13,15 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata = {
-  title: "AutoGrader AI",
+  title: "SmartGrader AI",
   description: "AI Assisted Grading for Google Classroom",
 };
 
 export default function RootLayout({ children }) {
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
       <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased bg-slate-50 text-slate-900`}
+        className={`${geistSans.variable} ${geistMono.variable} antialiased bg-slate-50 text-slate-900 dark:bg-slate-900 dark:text-slate-50`}
       >
         <Providers>{children}</Providers>
       </body>
