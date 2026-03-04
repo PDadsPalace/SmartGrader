@@ -1,6 +1,9 @@
 import { NextResponse } from "next/server";
 import { GoogleGenAI } from "@google/genai";
 
+export const maxDuration = 60; // 60 seconds timeout (maximum for Vercel Free tier)
+export const dynamic = 'force-dynamic';
+
 // For this prototype we're creating a mock "database" of student metadata
 // In a real application, this would be an actual database table keyed by student ID/email
 const MOCK_STUDENT_METADATA = {
