@@ -104,6 +104,6 @@ Evaluate the submission. You must return your evaluation strictly in the followi
 
     } catch (error) {
         console.error("Gemini Grading Error:", error);
-        return NextResponse.json({ error: "Failed to generate AI grade" }, { status: 500 });
+        return NextResponse.json({ error: "Failed to generate AI grade", details: error.message, stack: error.stack }, { status: 500 });
     }
 }
