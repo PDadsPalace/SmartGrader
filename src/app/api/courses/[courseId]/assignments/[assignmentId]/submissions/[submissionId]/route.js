@@ -30,13 +30,18 @@ export async function GET(request, { params }) {
 
         const submission = response.data;
 
-        // Check if there are attachments
-        if (!submission.assignmentSubmission?.attachments || submission.assignmentSubmission.attachments.length === 0) {
-            return NextResponse.json({ content: "No attachments found for this submission." });
-        }
+        // 1. Check if the assignment itself has a Google Form attached to the instructions
+        const courseWorkResponse = await classroom.courses.courseWork.get({
+            courseId: courseId,
+            id: assignmentId,
+        });
 
-        // 1. Check if the attachment is a Google Form
-        const formAttachment = submission.assignmentSubmission.attachments.find(att => att.form);
+        const courseWork = courseWorkResponse.data;
+        let formAttachment = null;
+
+        if (courseWork.materials) {
+            formAttachment = courseWork.materials.find(mat => mat.form);
+        }
 
         if (formAttachment) {
             try {
@@ -70,10 +75,11 @@ export async function GET(request, { params }) {
         }
 
         // 2. Fall back to standard Google Drive Files (Docs, Sheets, PDFs)
-        const driveAttachment = submission.assignmentSubmission.attachments.find(att => att.driveFile);
+        const attachments = submission.assignmentSubmission?.attachments || [];
+        const driveAttachment = attachments.find(att => att.driveFile);
 
         if (!driveAttachment) {
-            return NextResponse.json({ content: "Found attachments, but none of them are supported Google Docs, Sheets, or Forms." });
+            return NextResponse.json({ content: "No Supported Attachments Found. Ensure the student attached a Google Doc, Sheet, PDF, or Image." });
         }
 
         const fileId = driveAttachment.driveFile.id;
