@@ -51,12 +51,24 @@ export async function exportGoogleDocToText(accessToken, fileId) {
                 .on('data', chunk => { chunks.push(chunk); })
                 .on('end', () => {
                     const buffer = Buffer.concat(chunks);
-                    const isBinary = !finalMimeType.startsWith('text/');
-                    resolve({
-                        data: isBinary ? buffer.toString('base64') : buffer.toString('utf-8'),
-                        mimeType: finalMimeType,
-                        isBinary: isBinary
-                    });
+                    const isBinary = !finalMimeType.startsWith('text/') && finalMimeType !== 'application/rtf';
+
+                    const supportedBinaryPrefixes = ['image/', 'audio/', 'video/'];
+                    const isSupportedInlineData = finalMimeType === 'application/pdf' || supportedBinaryPrefixes.some(p => finalMimeType.startsWith(p));
+
+                    if (isBinary && !isSupportedInlineData) {
+                        resolve({
+                            data: `The student submitted an unsupported file format (${finalMimeType}). The AI currently only supports Google Docs, Google Sheets, PDFs, text files, and images. Please manually review their file from Google Classroom.`,
+                            mimeType: 'text/plain',
+                            isBinary: false
+                        });
+                    } else {
+                        resolve({
+                            data: isBinary ? buffer.toString('base64') : buffer.toString('utf-8'),
+                            mimeType: finalMimeType,
+                            isBinary: isBinary
+                        });
+                    }
                 })
                 .on('error', err => {
                     console.error("Error streaming Google Drive file:", err);
