@@ -9,7 +9,7 @@ export function getFormsClient(accessToken) {
     return google.forms({ version: "v1", auth });
 }
 
-export async function extractGoogleFormResponse(accessToken, formId, studentEmail) {
+export async function extractGoogleFormResponse(accessToken, formId, studentEmail, studentName) {
     try {
         const forms = getFormsClient(accessToken);
 
@@ -51,17 +51,40 @@ export async function extractGoogleFormResponse(accessToken, formId, studentEmai
         }
 
         // 3. Find the student's response using email
-        const targetEmail = studentEmail.toLowerCase();
-        let studentFormResponse = allResponses.find(r =>
-            r.respondentEmail && r.respondentEmail.toLowerCase() === targetEmail
-        );
+        let studentFormResponse = null;
+
+        if (studentEmail) {
+            const targetEmail = studentEmail.toLowerCase();
+            studentFormResponse = allResponses.find(r =>
+                r.respondentEmail && r.respondentEmail.toLowerCase() === targetEmail
+            );
+        }
+
+        // 3b. Fallback matching using First and Last Name
+        if (!studentFormResponse && studentName) {
+            const targetName = studentName.toLowerCase();
+            // Filter out initials or short parts to avoid false positives
+            const nameParts = targetName.split(' ').filter(p => p.length >= 3);
+
+            if (nameParts.length > 0) {
+                studentFormResponse = allResponses.find(r => {
+                    const answersObj = r.answers || {};
+                    // Concatenate EVERY text answer the student submitted into one giant string
+                    const allTextInResponse = Object.values(answersObj)
+                        .map(a => a.textAnswers?.answers?.map(ans => ans.value.toLowerCase()).join(' ') || '')
+                        .join(' ');
+
+                    // Check if *all* parts of their name appear SOMEWHERE in their answers (e.g. typing Daniel in Q1, Figueroa in Q2)
+                    return nameParts.every(part => allTextInResponse.includes(part));
+                });
+            }
+        }
 
         if (!studentFormResponse) {
-            // Fuzzy fallback: If email wasn't explicitly collected but maybe they typed it in a question?
             return {
                 isBinary: false,
                 mimeType: 'text/plain',
-                data: `Error: Could not find a Google Form submission for ${studentEmail}. Note: The teacher MUST enable 'Collect Email Addresses' in the Google Form settings for the AI to dynamically link students to their answers.`
+                data: `Error: Could not find a Google Form submission for '${studentName || studentEmail}'. Note: Because your school hides student emails, the AI tried to search the form answers for the student's name, but failed. Ensure the Google Form explicitly asks the student for their First and Last name!`
             };
         }
 

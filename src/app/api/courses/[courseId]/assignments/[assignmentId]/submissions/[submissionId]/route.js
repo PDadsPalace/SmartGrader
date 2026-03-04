@@ -54,18 +54,15 @@ export async function GET(request, { params }) {
                 }
                 const formId = formIdMatch[1];
 
-                // Get student's email to cross-reference with Form Responses
+                // Get student's email (or name for fallback) to cross-reference with Form Responses
                 const studentResponse = await classroom.courses.students.get({
                     courseId: courseId,
                     userId: submission.userId
                 });
                 const studentEmail = studentResponse.data.profile?.emailAddress;
+                const studentName = studentResponse.data.profile?.name?.fullName;
 
-                if (!studentEmail) {
-                    return NextResponse.json({ content: "Error: Could not determine the student's email address from Google Classroom to match their Google Form answers." });
-                }
-
-                const formExportData = await extractGoogleFormResponse(session.accessToken, formId, studentEmail);
+                const formExportData = await extractGoogleFormResponse(session.accessToken, formId, studentEmail, studentName);
                 return NextResponse.json(formExportData);
 
             } catch (formError) {
