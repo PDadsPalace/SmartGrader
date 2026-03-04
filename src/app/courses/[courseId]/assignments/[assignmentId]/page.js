@@ -509,7 +509,8 @@ export default function GradingWorkspace() {
                 const sNotes = localStorage.getItem(`student_notes_${sub.userId}`) || "";
 
                 // Phase 8: Hardcode Missing Work Logic
-                const isNotTurnedIn = sub.state !== "TURNED_IN";
+                const isFormSubmission = submissionTextForAI && submissionTextForAI.includes("Google Form Responses for:");
+                const isNotTurnedIn = sub.state !== "TURNED_IN" && !isFormSubmission;
                 const isTextEmpty = !submissionTextForAI ||
                     submissionTextForAI === "Empty document or non-text attachment." ||
                     submissionTextForAI.includes("No attachments found") ||
