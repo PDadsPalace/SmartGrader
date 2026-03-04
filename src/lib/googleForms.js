@@ -25,15 +25,21 @@ export async function extractGoogleFormResponse(accessToken, formId, studentEmai
             };
         }
 
-        // Map Question IDs to Question Titles
         const questionMap = {};
         form.items.forEach(item => {
             if (item.questionItem && item.questionItem.question) {
-                questionMap[item.questionItem.question.questionId] = item.title || "Untitled Question";
+                const q = item.questionItem.question;
+                questionMap[q.questionId] = {
+                    title: item.title || "Untitled Question",
+                    correctAnswers: q.grading?.correctAnswers?.answers?.map(a => a.value) || []
+                };
             } else if (item.questionGroupItem && item.questionGroupItem.questions) {
                 // Handle grid/matrix questions if any
                 item.questionGroupItem.questions.forEach(q => {
-                    questionMap[q.questionId] = `${item.title || "Group"} - Row`;
+                    questionMap[q.questionId] = {
+                        title: `${item.title || "Group"} - Row`,
+                        correctAnswers: q.grading?.correctAnswers?.answers?.map(a => a.value) || []
+                    };
                 });
             }
         });
@@ -96,12 +102,17 @@ export async function extractGoogleFormResponse(accessToken, formId, studentEmai
         const answers = studentFormResponse.answers || {};
 
         for (const [questionId, answerObj] of Object.entries(answers)) {
-            const questionText = questionMap[questionId] || "Unknown Question";
+            const qInfo = questionMap[questionId] || { title: "Unknown Question", correctAnswers: [] };
             const answerText = answerObj.textAnswers?.answers?.map(a => a.value).join(", ") || "No Answer / Blank";
 
-            compiledText += `Question: ${questionText}\n`;
-            compiledText += `Student Answer: ${answerText}\n\n`;
-            compiledText += `------------------------\n\n`;
+            compiledText += `Question: ${qInfo.title}\n`;
+            compiledText += `Student Answer: ${answerText}\n`;
+
+            if (qInfo.correctAnswers && qInfo.correctAnswers.length > 0) {
+                compiledText += `[NATIVE FORM ANSWER KEY]: The correct answer programmed into the Google Form Quiz is: ${qInfo.correctAnswers.join(" OR ")}\n`;
+            }
+
+            compiledText += `\n------------------------\n\n`;
         }
 
         return {
