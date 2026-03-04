@@ -926,17 +926,28 @@ export default function GradingWorkspace() {
                                     <div>
                                         <div className="flex justify-between items-end mb-2">
                                             <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300">Answer Key / Rubric</label>
-                                            <div className="relative">
-                                                <input
-                                                    type="file"
-                                                    accept="image/*,.pdf"
-                                                    onChange={handleFileChange}
-                                                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                                                />
-                                                <button type="button" className="text-xs bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 px-3 py-1.5 rounded-lg flex items-center gap-1.5 font-medium border border-slate-300 dark:border-slate-700 transition-colors">
-                                                    <FileText className="w-3.5 h-3.5" />
-                                                    {rubricFile ? rubricFile.name : "Upload File (PDF/Image)"}
-                                                </button>
+                                            <div className="flex items-center gap-2">
+                                                {rubricFile && (
+                                                    <button
+                                                        onClick={() => setRubricFile(null)}
+                                                        className="text-xs bg-red-100 dark:bg-red-900/40 hover:bg-red-200 dark:hover:bg-red-800 text-red-700 dark:text-red-400 px-2 py-1.5 rounded-lg flex items-center gap-1 font-bold border border-red-200 dark:border-red-800 transition-colors z-10"
+                                                        title="Remove attached Answer Key"
+                                                    >
+                                                        <X className="w-3.5 h-3.5" /> Clear
+                                                    </button>
+                                                )}
+                                                <div className="relative">
+                                                    <input
+                                                        type="file"
+                                                        accept="image/*,.pdf"
+                                                        onChange={handleFileChange}
+                                                        className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+                                                    />
+                                                    <button type="button" className="text-xs bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 px-3 py-1.5 rounded-lg flex items-center gap-1.5 font-medium border border-slate-300 dark:border-slate-700 transition-colors">
+                                                        <FileText className="w-3.5 h-3.5 text-indigo-500" />
+                                                        <span className="max-w-[150px] truncate">{rubricFile ? rubricFile.name : "Upload File (PDF/Image)"}</span>
+                                                    </button>
+                                                </div>
                                             </div>
                                         </div>
                                         <textarea
