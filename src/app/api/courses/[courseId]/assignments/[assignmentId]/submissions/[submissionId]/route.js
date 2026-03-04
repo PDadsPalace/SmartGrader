@@ -79,7 +79,7 @@ export async function GET(request, { params }) {
         const driveAttachment = attachments.find(att => att.driveFile);
 
         if (!driveAttachment) {
-            return NextResponse.json({ content: "No Supported Attachments Found. Ensure the student attached a Google Doc, Sheet, PDF, or Image." });
+            return NextResponse.json({ content: "No Supported Attachments Found. Materials attached to assignment: " + JSON.stringify(courseWork.materials) });
         }
 
         const fileId = driveAttachment.driveFile.id;
