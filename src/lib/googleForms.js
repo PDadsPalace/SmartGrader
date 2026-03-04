@@ -21,7 +21,7 @@ export async function extractGoogleFormResponse(accessToken, formId, studentEmai
             return {
                 isBinary: false,
                 mimeType: 'text/plain',
-                data: "Error: Could not retrieve questions from this Google Form. It may be empty or improperly formatted."
+                content: "Error: Could not retrieve questions from this Google Form. It may be empty or improperly formatted."
             };
         }
 
@@ -46,7 +46,7 @@ export async function extractGoogleFormResponse(accessToken, formId, studentEmai
             return {
                 isBinary: false,
                 mimeType: 'text/plain',
-                data: `No responses found for this Google Form yet.`
+                content: `No responses found for this Google Form yet.`
             };
         }
 
@@ -84,7 +84,7 @@ export async function extractGoogleFormResponse(accessToken, formId, studentEmai
             return {
                 isBinary: false,
                 mimeType: 'text/plain',
-                data: `Error: Could not find a Google Form submission for '${studentName || studentEmail}'. Note: Because your school hides student emails, the AI tried to search the form answers for the student's name, but failed. Ensure the Google Form explicitly asks the student for their First and Last name!`
+                content: `Error: Could not find a Google Form submission for '${studentName || studentEmail}'. Note: Because your school hides student emails, the AI tried to search the form answers for the student's name, but failed. Ensure the Google Form explicitly asks the student for their First and Last name!`
             };
         }
 
