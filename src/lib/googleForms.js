@@ -107,7 +107,7 @@ export async function extractGoogleFormResponse(accessToken, formId, studentEmai
         return {
             isBinary: false,
             mimeType: 'text/plain',
-            data: compiledText
+            content: compiledText
         };
 
     } catch (error) {
