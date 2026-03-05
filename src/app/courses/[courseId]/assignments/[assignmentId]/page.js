@@ -59,6 +59,7 @@ export default function GradingWorkspace() {
 
     const [useStudentAsKey, setUseStudentAsKey] = useState(false);
     const [keyStudentId, setKeyStudentId] = useState("");
+    const [filterMode, setFilterMode] = useState("All");
 
     useEffect(() => {
         if (status === "unauthenticated") {
@@ -288,7 +289,7 @@ export default function GradingWorkspace() {
                         if (docData.data) keyText = docData.data;
                         else if (docData.content) keyText = docData.content;
                         if (keyText) {
-                            runtimeRubric = "Use the following student submission as the perfect 100% Answer Key. Every other student must be graded strictly against how well their answers match this master student's answers: \n\n" + keyText;
+                            runtimeRubric = `Use the following student submission as the perfect 100% Answer Key. Every other student must be graded strictly against how well their answers match this master student's answers.\n\nAdditional Instructions from Teacher:\n${rubric}\n\n[MASTER STUDENT TEXT]:\n\n` + keyText;
                             runtimeRubricFile = null;
                             if (docData.isBinary && docData.data) {
                                 runtimeRubricFile = { data: docData.data, mimeType: docData.mimeType };
@@ -503,7 +504,7 @@ export default function GradingWorkspace() {
                     if (docData.data) keyText = docData.data;
                     else if (docData.content) keyText = docData.content;
                     if (keyText) {
-                        baselineRubric = "Use the following student submission as the perfect 100% Answer Key. Every other student must be graded strictly against how well their answers match this master student's answers: \n\n" + keyText;
+                        baselineRubric = `Use the following student submission as the perfect 100% Answer Key. Every other student must be graded strictly against how well their answers match this master student's answers.\n\nAdditional Instructions from Teacher:\n${rubric}\n\n[MASTER STUDENT TEXT]:\n\n` + keyText;
                         baselineRubricFile = null;
                         if (docData.isBinary && docData.data) {
                             baselineRubricFile = { data: docData.data, mimeType: docData.mimeType };
@@ -714,6 +715,15 @@ export default function GradingWorkspace() {
 
     if (!session) return null;
 
+    const filteredSubmissions = submissions.filter(sub => {
+        const result = batchResults[sub.id];
+        const isGraded = result && result.grade !== "Not Graded" && result.grade !== "Error" && result.grade !== "Failed" && result.grade !== "N/A";
+
+        if (filterMode === "Graded") return isGraded;
+        if (filterMode === "Ungraded") return !isGraded;
+        return true;
+    });
+
     return (
         <div className="h-screen bg-slate-50 dark:bg-slate-900 flex flex-col overflow-hidden">
             {/* Header */}
@@ -743,12 +753,23 @@ export default function GradingWorkspace() {
 
                 {/* Left Panel: Roster & Submissions */}
                 <div className="w-1/3 flex flex-col border-r border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 z-10">
-                    <div className="p-4 border-b border-slate-100 dark:border-slate-800 bg-slate-50/50 flex justify-between items-center">
-                        <h2 className="font-semibold text-slate-800 dark:text-slate-200 flex items-center gap-2">
-                            <User className="w-4 h-4 text-slate-500 dark:text-slate-400" />
-                            Student Submissions ({submissions.length})
-                        </h2>
-                        <div className="flex items-center gap-2">
+                    <div className="p-4 border-b border-slate-100 dark:border-slate-800 bg-slate-50/50 flex justify-between items-center flex-wrap gap-y-3">
+                        <div className="flex w-full justify-between items-center">
+                            <h2 className="font-semibold text-slate-800 dark:text-slate-200 flex items-center gap-2">
+                                <User className="w-4 h-4 text-slate-500 dark:text-slate-400" />
+                                Submissions ({filteredSubmissions.length}/{submissions.length})
+                            </h2>
+                            <select
+                                value={filterMode}
+                                onChange={(e) => setFilterMode(e.target.value)}
+                                className="text-xs font-bold bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg px-2 py-1 text-slate-700 dark:text-slate-300 outline-none focus:ring-2 focus:ring-indigo-500"
+                            >
+                                <option value="All">Show All</option>
+                                <option value="Ungraded">Ungraded Only</option>
+                                <option value="Graded">Graded Only</option>
+                            </select>
+                        </div>
+                        <div className="flex items-center gap-2 w-full justify-end">
                             {Object.keys(batchResults).length > 0 && (
                                 <div className="text-xs font-black px-3 py-1.5 rounded-lg bg-indigo-50 dark:bg-indigo-900/40 border border-indigo-200 text-indigo-700 dark:text-indigo-400 mr-2 flex items-center gap-1.5 shadow-sm">
                                     <span className="opacity-70 font-semibold tracking-wider">AVG:</span>
@@ -824,10 +845,10 @@ export default function GradingWorkspace() {
                         </div>
                     </div>
                     <div className="flex-1 overflow-y-auto p-3 space-y-2">
-                        {submissions.length === 0 ? (
-                            <div className="text-center p-6 text-slate-500 dark:text-slate-400 text-sm">No submissions found for this assignment yet.</div>
+                        {filteredSubmissions.length === 0 ? (
+                            <div className="text-center p-6 text-slate-500 dark:text-slate-400 text-sm">No submissions match the current view.</div>
                         ) : (
-                            submissions.map((sub) => (
+                            filteredSubmissions.map((sub) => (
                                 <div
                                     key={sub.id}
                                     onClick={() => {
@@ -1018,8 +1039,8 @@ export default function GradingWorkspace() {
                                             )}
                                         </div>
 
-                                        {useStudentAsKey ? (
-                                            <div className="bg-indigo-50 dark:bg-indigo-900/20 p-4 rounded-xl border border-indigo-100 dark:border-indigo-800 mt-2">
+                                        {useStudentAsKey && (
+                                            <div className="bg-indigo-50 dark:bg-indigo-900/20 p-4 rounded-xl border border-indigo-100 dark:border-indigo-800 mt-2 mb-4">
                                                 <label className="block text-xs font-bold text-indigo-800 dark:text-indigo-300 mb-2 uppercase tracking-wide">Select Master Student</label>
                                                 <select
                                                     value={keyStudentId}
@@ -1035,14 +1056,14 @@ export default function GradingWorkspace() {
                                                 </select>
                                                 <p className="text-xs text-indigo-600 dark:text-indigo-400 mt-2">Every other student will be graded based on how closely their answers match this selected student's work.</p>
                                             </div>
-                                        ) : (
-                                            <textarea
-                                                value={rubric}
-                                                onChange={(e) => setRubric(e.target.value)}
-                                                placeholder="Paste the grading rubric or correct answers here, or upload a file above..."
-                                                className="w-full h-32 p-3 text-sm border border-slate-200 dark:border-slate-800 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none resize-y text-slate-800 dark:text-slate-200 placeholder:text-slate-400"
-                                            ></textarea>
                                         )}
+                                        <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-2">{useStudentAsKey ? "Additional Instructions for AI (Optional)" : "Rubric / Answer Key Content"}</label>
+                                        <textarea
+                                            value={rubric}
+                                            onChange={(e) => setRubric(e.target.value)}
+                                            placeholder={useStudentAsKey ? "e.g. Ignore minor spelling mistakes..." : "Paste the grading rubric or correct answers here, or upload a file above..."}
+                                            className="w-full h-32 p-3 text-sm border border-slate-200 dark:border-slate-800 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none resize-y text-slate-800 dark:text-slate-200 placeholder:text-slate-400"
+                                        ></textarea>
                                     </div>
 
                                     <button
@@ -1060,6 +1081,35 @@ export default function GradingWorkspace() {
                             </div>
 
                             {/* AI Feedback Results */}
+                            {!aiFeedback && !contentLoading && (
+                                <div className="bg-slate-50 dark:bg-slate-900 p-6 rounded-2xl border border-slate-200 dark:border-slate-800 animate-in slide-in-from-bottom-4 duration-300 mt-6">
+                                    <h3 className="font-bold text-slate-700 dark:text-slate-300 mb-2">Manual Grade Entry</h3>
+                                    <p className="text-sm text-slate-500 dark:text-slate-400 mb-4">This submission is ungraded. You can manually assign a grade bypassing the AI.</p>
+                                    <div className="flex items-center gap-3">
+                                        <input
+                                            type="number"
+                                            placeholder="Grade"
+                                            onKeyDown={(e) => {
+                                                if (e.key === 'Enter') {
+                                                    const newGrade = e.target.value;
+                                                    if (!newGrade) return;
+                                                    setAiFeedback({ grade: newGrade, feedback: "Manually graded by teacher." });
+                                                    setBatchResults(prev => ({
+                                                        ...prev,
+                                                        [selectedSubmission.id]: {
+                                                            grade: newGrade,
+                                                            feedback: "Manually graded by teacher."
+                                                        }
+                                                    }));
+                                                }
+                                            }}
+                                            className="text-lg font-bold text-slate-900 dark:text-slate-50 border border-slate-300 rounded inline-block w-24 px-3 py-1 outline-none text-center"
+                                        />
+                                        <span className="text-xs text-slate-400">Press Enter to save</span>
+                                    </div>
+                                </div>
+                            )}
+
                             {aiFeedback && (
                                 <div className="bg-indigo-50 dark:bg-indigo-900/40 p-6 rounded-2xl border border-indigo-100 animate-in slide-in-from-bottom-4 duration-300 relative overflow-hidden">
                                     <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-200 rounded-full blur-3xl opacity-30 -mr-10 -mt-10 pointer-events-none"></div>
@@ -1073,7 +1123,17 @@ export default function GradingWorkspace() {
                                     </div>
 
                                     <div className="mb-4 relative z-10">
-                                        <span className="text-xs uppercase tracking-wider font-bold text-indigo-500 mb-1 block">Final Grade Override</span>
+                                        <div className="flex justify-between items-center mb-1">
+                                            <span className="text-xs uppercase tracking-wider font-bold text-indigo-500 block">Final Grade Override</span>
+                                            <button onClick={() => {
+                                                setAiFeedback(null);
+                                                setBatchResults(prev => {
+                                                    const next = { ...prev };
+                                                    delete next[selectedSubmission.id];
+                                                    return next;
+                                                });
+                                            }} className="text-xs font-bold text-red-500 hover:bg-red-50 dark:hover:bg-red-900/30 px-2 py-1 rounded transition-colors">🗑️ Clear Grade</button>
+                                        </div>
                                         <div className="flex items-center gap-3">
                                             <input
                                                 type="text"
