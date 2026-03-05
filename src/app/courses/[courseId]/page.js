@@ -155,6 +155,11 @@ export default function CourseAssignments() {
             const statuses = {};
             const averages = {};
             assignments.forEach(a => {
+                // Check if manually marked as graded
+                if (localStorage.getItem(`manual_graded_${courseId}_${a.id}`) === "true") {
+                    statuses[a.id] = true;
+                }
+
                 const savedGrades = localStorage.getItem(`grades_${courseId}_${a.id}`);
                 if (savedGrades) {
                     try {
@@ -367,12 +372,40 @@ export default function CourseAssignments() {
                                                             : "No due date"}
                                                     </span>
                                                 </div>
-                                                <button
-                                                    onClick={() => router.push(`/courses/${courseId}/assignments/${assignment.id}`)}
-                                                    className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors cursor-pointer flex items-center gap-2 active:scale-95 ${gradedStatus[assignment.id] ? "bg-emerald-100 dark:bg-emerald-900/60 text-emerald-800 dark:text-emerald-400 hover:bg-emerald-200 font-bold" : "bg-slate-900 hover:bg-slate-800 text-white"}`}
-                                                >
-                                                    {gradedStatus[assignment.id] ? "Review Grades" : "Grade with AI"}
-                                                </button>
+                                                <div className="flex items-center gap-2">
+                                                    {!gradedStatus[assignment.id] && (
+                                                        <button
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                localStorage.setItem(`manual_graded_${courseId}_${assignment.id}`, "true");
+                                                                setGradedStatus(prev => ({ ...prev, [assignment.id]: true }));
+                                                            }}
+                                                            title="Mark as Graded Manually"
+                                                            className="p-2 text-slate-400 hover:text-emerald-500 hover:bg-emerald-50 dark:hover:bg-emerald-900/30 rounded-lg transition-colors flex items-center gap-1 text-xs font-bold"
+                                                        >
+                                                            <CheckCircle2 className="w-4 h-4" /> Mark Graded
+                                                        </button>
+                                                    )}
+                                                    {localStorage.getItem(`manual_graded_${courseId}_${assignment.id}`) === "true" && (
+                                                        <button
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                localStorage.removeItem(`manual_graded_${courseId}_${assignment.id}`);
+                                                                setGradedStatus(prev => ({ ...prev, [assignment.id]: false }));
+                                                            }}
+                                                            title="Remove Manual Graded Status"
+                                                            className="p-2 text-emerald-500 hover:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 rounded-lg transition-colors flex items-center gap-1 text-xs font-bold"
+                                                        >
+                                                            <X className="w-4 h-4" /> Unmark Graded
+                                                        </button>
+                                                    )}
+                                                    <button
+                                                        onClick={() => router.push(`/courses/${courseId}/assignments/${assignment.id}`)}
+                                                        className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors cursor-pointer flex items-center gap-2 active:scale-95 ${gradedStatus[assignment.id] ? "bg-emerald-100 dark:bg-emerald-900/60 text-emerald-800 dark:text-emerald-400 hover:bg-emerald-200 font-bold" : "bg-slate-900 hover:bg-slate-800 text-white"}`}
+                                                    >
+                                                        {gradedStatus[assignment.id] ? "Review Grades" : "Grade with AI"}
+                                                    </button>
+                                                </div>
                                             </div>
                                         </div>
                                     </div>

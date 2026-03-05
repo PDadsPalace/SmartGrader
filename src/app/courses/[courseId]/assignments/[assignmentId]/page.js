@@ -516,146 +516,155 @@ export default function GradingWorkspace() {
             }
         }
 
-        let newResults = { ...batchResults };
         stopGradingRef.current = false;
+        let completedCount = 0;
+        const CHUNK_SIZE = 5; // Process 5 students simultaneously
 
-        for (let i = 0; i < submissions.length; i++) {
+        for (let i = 0; i < submissions.length; i += CHUNK_SIZE) {
             if (stopGradingRef.current) break;
-            const sub = submissions[i];
-            setBatchProgress({ current: i + 1, total: submissions.length });
+            const chunk = submissions.slice(i, i + CHUNK_SIZE);
 
-            try {
-                // Skip if already graded in this session (unless forced)
-                if (!forceRegrade && newResults[sub.id]) continue;
+            await Promise.all(chunk.map(async (sub) => {
+                if (stopGradingRef.current) return;
 
-                // 1. Fetch content
-                const docRes = await fetch(`/api/courses/${courseId}/assignments/${assignmentId}/submissions/${sub.id}`);
-
-                if (docRes.status === 401) {
-                    throw new Error("Google API token expired. Please log out and log back in to renew your session.");
-                }
-                if (docRes.status === 403) {
-                    throw new Error("Google Drive access denied. Please log out and log back in to grant permission.");
-                }
-
-                const docData = await docRes.json();
-
-                if (!docRes.ok) {
-                    throw new Error(docData.error || "Failed to load document content.");
-                }
-
-                let submissionTextForAI = "Empty document or non-text attachment.";
-                let inlineDataForAI = null;
-
-                if (docData.data && docData.isBinary) {
-                    submissionTextForAI = "See attached student file.";
-                    inlineDataForAI = {
-                        data: docData.data,
-                        mimeType: docData.mimeType
-                    };
-                } else if (docData.data) {
-                    submissionTextForAI = docData.data;
-                } else if (docData.content) {
-                    submissionTextForAI = docData.content;
-                }
-
-                // Get their specific note
-                const sNotes = localStorage.getItem(`student_notes_${sub.userId}`) || "";
-
-                // Phase 8: Hardcode Missing Work Logic
-                const isFormSubmission = submissionTextForAI && submissionTextForAI.includes("Google Form Responses for:");
-                const isNotTurnedIn = sub.state !== "TURNED_IN" && !isFormSubmission;
-                const isTextEmpty = !submissionTextForAI ||
-                    submissionTextForAI === "Empty document or non-text attachment." ||
-                    submissionTextForAI.includes("No attachments found") ||
-                    submissionTextForAI.includes("none of them are Google Drive files") ||
-                    !submissionTextForAI.trim();
-
-                if (isNotTurnedIn || (isTextEmpty && !inlineDataForAI)) {
-                    let mockGrade = "50";
-                    if (/\b0\b/.test(sNotes) || /\bzero\b/i.test(sNotes)) {
-                        mockGrade = "0";
+                try {
+                    // Skip if already graded in this session (unless forced)
+                    // We check the captured batchResults from the top of the function
+                    if (!forceRegrade && batchResults[sub.id]) {
+                        completedCount++;
+                        setBatchProgress({ current: completedCount, total: submissions.length });
+                        return;
                     }
-                    const mockFeedback = "Missing assignment. No file or text was submitted.";
 
-                    const sFloor = localStorage.getItem(`student_floor_${sub.userId}`);
-                    if (sFloor) {
-                        const floorVal = parseFloat(sFloor);
-                        const returnedVal = parseFloat(mockGrade);
-                        if (!isNaN(floorVal) && !isNaN(returnedVal) && returnedVal < floorVal) {
-                            mockGrade = floorVal.toString();
+                    // 1. Fetch content
+                    const docRes = await fetch(`/api/courses/${courseId}/assignments/${assignmentId}/submissions/${sub.id}`);
+
+                    if (docRes.status === 401) {
+                        throw new Error("Google API token expired. Please log out and log back in to renew your session.");
+                    }
+                    if (docRes.status === 403) {
+                        throw new Error("Google Drive access denied. Please log out and log back in to grant permission.");
+                    }
+
+                    const docData = await docRes.json();
+
+                    if (!docRes.ok) {
+                        throw new Error(docData.error || "Failed to load document content.");
+                    }
+
+                    let submissionTextForAI = "Empty document or non-text attachment.";
+                    let inlineDataForAI = null;
+
+                    if (docData.data && docData.isBinary) {
+                        submissionTextForAI = "See attached student file.";
+                        inlineDataForAI = {
+                            data: docData.data,
+                            mimeType: docData.mimeType
+                        };
+                    } else if (docData.data) {
+                        submissionTextForAI = docData.data;
+                    } else if (docData.content) {
+                        submissionTextForAI = docData.content;
+                    }
+
+                    // Get their specific note
+                    const sNotes = localStorage.getItem(`student_notes_${sub.userId}`) || "";
+
+                    const isFormSubmission = submissionTextForAI && submissionTextForAI.includes("Google Form Responses for:");
+                    const isNotTurnedIn = sub.state !== "TURNED_IN" && !isFormSubmission;
+                    const isTextEmpty = !submissionTextForAI ||
+                        submissionTextForAI === "Empty document or non-text attachment." ||
+                        submissionTextForAI.includes("No attachments found") ||
+                        submissionTextForAI.includes("none of them are Google Drive files") ||
+                        !submissionTextForAI.trim();
+
+                    if (isNotTurnedIn || (isTextEmpty && !inlineDataForAI)) {
+                        let mockGrade = "50";
+                        if (/\b0\b/.test(sNotes) || /\bzero\b/i.test(sNotes)) {
+                            mockGrade = "0";
                         }
-                    }
+                        const mockFeedback = "Missing assignment. No file or text was submitted.";
 
-                    newResults[sub.id] = { grade: mockGrade, feedback: mockFeedback };
-                    setBatchResults({ ...newResults });
-
-                    if (selectedSubmission && selectedSubmission.id === sub.id) {
-                        setAiFeedback({ grade: mockGrade, feedback: mockFeedback });
-                    }
-                    continue; // Skip the API call for this student
-                }
-
-                // 2. Grade
-                const gradeRes = await fetch('/api/grade', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        rubric: baselineRubric,
-                        strictness: strictness,
-                        submissionText: submissionTextForAI,
-                        studentId: sub.userId,
-                        studentNotes: sNotes,
-                        studentFile: inlineDataForAI,
-                        rubricFile: baselineRubricFile,
-                        generateFeedback: generateFeedback
-                    })
-                });
-
-                const gradeData = await gradeRes.json();
-
-                if (gradeRes.ok) {
-                    let finalGradeCalculated = gradeData.grade || "N/A";
-
-                    // Clamp Grade Floor for Batch Process
-                    const sFloor = localStorage.getItem(`student_floor_${sub.userId}`);
-                    if (sFloor) {
-                        const floorVal = parseFloat(sFloor);
-                        const returnedVal = parseFloat(finalGradeCalculated);
-                        if (!isNaN(floorVal) && !isNaN(returnedVal) && returnedVal < floorVal) {
-                            finalGradeCalculated = floorVal.toString();
+                        const sFloor = localStorage.getItem(`student_floor_${sub.userId}`);
+                        if (sFloor) {
+                            const floorVal = parseFloat(sFloor);
+                            const returnedVal = parseFloat(mockGrade);
+                            if (!isNaN(floorVal) && !isNaN(returnedVal) && returnedVal < floorVal) {
+                                mockGrade = floorVal.toString();
+                            }
                         }
+
+                        const resultObj = { grade: mockGrade, feedback: mockFeedback };
+                        setBatchResults(prev => ({ ...prev, [sub.id]: resultObj }));
+
+                        if (selectedSubmission && selectedSubmission.id === sub.id) {
+                            setAiFeedback(resultObj);
+                        }
+                        completedCount++;
+                        setBatchProgress({ current: completedCount, total: submissions.length });
+                        return; // Skip the API call for this student
                     }
 
-                    newResults[sub.id] = {
-                        grade: finalGradeCalculated,
-                        feedback: gradeData.feedback || "No feedback returned."
-                    };
-                    setBatchResults({ ...newResults }); // update state progressively
+                    // 2. Grade
+                    const gradeRes = await fetch('/api/grade', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            rubric: baselineRubric,
+                            strictness: strictness,
+                            submissionText: submissionTextForAI,
+                            studentId: sub.userId,
+                            studentNotes: sNotes,
+                            studentFile: inlineDataForAI,
+                            rubricFile: baselineRubricFile,
+                            generateFeedback: generateFeedback
+                        })
+                    });
 
-                    // Update UI if this is the currently selected one
-                    if (selectedSubmission && selectedSubmission.id === sub.id) {
-                        setAiFeedback({
+                    const gradeData = await gradeRes.json();
+
+                    if (gradeRes.ok) {
+                        let finalGradeCalculated = gradeData.grade || "N/A";
+
+                        // Clamp Grade Floor for Batch Process
+                        const sFloor = localStorage.getItem(`student_floor_${sub.userId}`);
+                        if (sFloor) {
+                            const floorVal = parseFloat(sFloor);
+                            const returnedVal = parseFloat(finalGradeCalculated);
+                            if (!isNaN(floorVal) && !isNaN(returnedVal) && returnedVal < floorVal) {
+                                finalGradeCalculated = floorVal.toString();
+                            }
+                        }
+
+                        const resultObj = {
                             grade: finalGradeCalculated,
                             feedback: gradeData.feedback || "No feedback returned."
-                        });
-                    }
-                } else {
-                    newResults[sub.id] = {
-                        grade: "Error",
-                        feedback: gradeData.error || "The AI rejected the request."
-                    };
-                    setBatchResults({ ...newResults });
-                }
+                        };
+                        setBatchResults(prev => ({ ...prev, [sub.id]: resultObj }));
 
-            } catch (err) {
-                console.error("Batch grading error for submission", sub.id, err);
-                newResults[sub.id] = {
-                    grade: "Failed",
-                    feedback: err.message || "An unexpected system error occurred."
-                };
-                setBatchResults({ ...newResults });
-            }
+                        if (selectedSubmission && selectedSubmission.id === sub.id) {
+                            setAiFeedback(resultObj);
+                        }
+                    } else {
+                        const errObj = {
+                            grade: "Error",
+                            feedback: gradeData.error || "The AI rejected the request."
+                        };
+                        setBatchResults(prev => ({ ...prev, [sub.id]: errObj }));
+                    }
+
+                } catch (err) {
+                    console.error("Batch grading error for submission", sub.id, err);
+                    const failObj = {
+                        grade: "Failed",
+                        feedback: err.message || "An unexpected system error occurred."
+                    };
+                    setBatchResults(prev => ({ ...prev, [sub.id]: failObj }));
+                } finally {
+                    completedCount++;
+                    setBatchProgress({ current: completedCount, total: submissions.length });
+                }
+            }));
         }
 
         setBatchGrading(false);
