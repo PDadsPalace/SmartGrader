@@ -57,6 +57,9 @@ export default function GradingWorkspace() {
     const [rosterSetupError, setRosterSetupError] = useState("");
     const [assignmentInfo, setAssignmentInfo] = useState(null); // Full assignment object
 
+    const [useStudentAsKey, setUseStudentAsKey] = useState(false);
+    const [keyStudentId, setKeyStudentId] = useState("");
+
     useEffect(() => {
         if (status === "unauthenticated") {
             router.push("/");
@@ -272,17 +275,42 @@ export default function GradingWorkspace() {
                 return; // Stop here, no API call
             }
 
+            let runtimeRubric = rubric;
+            let runtimeRubricFile = rubricFile ? { data: rubricFile.base64.split(",")[1], mimeType: rubricFile.mimeType } : null;
+
+            if (useStudentAsKey && keyStudentId) {
+                const keySub = submissions.find(s => s.userId === keyStudentId);
+                if (keySub) {
+                    try {
+                        const keyRes = await fetch(`/api/courses/${courseId}/assignments/${assignmentId}/submissions/${keySub.id}`);
+                        const docData = await keyRes.json();
+                        let keyText = "";
+                        if (docData.data) keyText = docData.data;
+                        else if (docData.content) keyText = docData.content;
+                        if (keyText) {
+                            runtimeRubric = "Use the following student submission as the perfect 100% Answer Key. Every other student must be graded strictly against how well their answers match this master student's answers: \n\n" + keyText;
+                            runtimeRubricFile = null;
+                            if (docData.isBinary && docData.data) {
+                                runtimeRubricFile = { data: docData.data, mimeType: docData.mimeType };
+                            }
+                        }
+                    } catch (e) {
+                        console.error("Failed to fetch student key", e);
+                    }
+                }
+            }
+
             const res = await fetch('/api/grade', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    rubric: rubric,
+                    rubric: runtimeRubric,
                     strictness: strictness,
                     submissionText: submissionTextOnly, // Use the real text now or the placeholder if binary
                     studentId: selectedSubmission.userId,
                     studentNotes: studentNotes,
                     studentFile: inlineDataContent,
-                    rubricFile: rubricFile ? { data: rubricFile.base64.split(",")[1], mimeType: rubricFile.mimeType } : null,
+                    rubricFile: runtimeRubricFile,
                     generateFeedback: generateFeedback
                 })
             });
@@ -462,6 +490,31 @@ export default function GradingWorkspace() {
         setBatchProgress({ current: 0, total: submissions.length });
         setError(null);
 
+        let baselineRubric = rubric;
+        let baselineRubricFile = rubricFile ? { data: rubricFile.base64.split(",")[1], mimeType: rubricFile.mimeType } : null;
+
+        if (useStudentAsKey && keyStudentId) {
+            const keySub = submissions.find(s => s.userId === keyStudentId);
+            if (keySub) {
+                try {
+                    const keyRes = await fetch(`/api/courses/${courseId}/assignments/${assignmentId}/submissions/${keySub.id}`);
+                    const docData = await keyRes.json();
+                    let keyText = "";
+                    if (docData.data) keyText = docData.data;
+                    else if (docData.content) keyText = docData.content;
+                    if (keyText) {
+                        baselineRubric = "Use the following student submission as the perfect 100% Answer Key. Every other student must be graded strictly against how well their answers match this master student's answers: \n\n" + keyText;
+                        baselineRubricFile = null;
+                        if (docData.isBinary && docData.data) {
+                            baselineRubricFile = { data: docData.data, mimeType: docData.mimeType };
+                        }
+                    }
+                } catch (e) {
+                    console.error("Failed to fetch batch student key", e);
+                }
+            }
+        }
+
         let newResults = { ...batchResults };
         stopGradingRef.current = false;
 
@@ -547,13 +600,13 @@ export default function GradingWorkspace() {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
-                        rubric: rubric,
+                        rubric: baselineRubric,
                         strictness: strictness,
                         submissionText: submissionTextForAI,
                         studentId: sub.userId,
                         studentNotes: sNotes,
                         studentFile: inlineDataForAI,
-                        rubricFile: rubricFile ? { data: rubricFile.base64.split(",")[1], mimeType: rubricFile.mimeType } : null,
+                        rubricFile: baselineRubricFile,
                         generateFeedback: generateFeedback
                     })
                 });
@@ -927,36 +980,69 @@ export default function GradingWorkspace() {
                                     <div>
                                         <div className="flex justify-between items-end mb-2">
                                             <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300">Answer Key / Rubric</label>
-                                            <div className="flex items-center gap-2">
-                                                {rubricFile && (
-                                                    <button
-                                                        onClick={() => setRubricFile(null)}
-                                                        className="text-xs bg-red-100 dark:bg-red-900/40 hover:bg-red-200 dark:hover:bg-red-800 text-red-700 dark:text-red-400 px-2 py-1.5 rounded-lg flex items-center gap-1 font-bold border border-red-200 dark:border-red-800 transition-colors z-10"
-                                                        title="Remove attached Answer Key"
-                                                    >
-                                                        <X className="w-3.5 h-3.5" /> Clear
-                                                    </button>
-                                                )}
-                                                <div className="relative">
-                                                    <input
-                                                        type="file"
-                                                        accept="image/*,.pdf"
-                                                        onChange={handleFileChange}
-                                                        className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
-                                                    />
-                                                    <button type="button" className="text-xs bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 px-3 py-1.5 rounded-lg flex items-center gap-1.5 font-medium border border-slate-300 dark:border-slate-700 transition-colors">
-                                                        <FileText className="w-3.5 h-3.5 text-indigo-500" />
-                                                        <span className="max-w-[150px] truncate">{rubricFile ? rubricFile.name : "Upload File (PDF/Image)"}</span>
-                                                    </button>
+
+                                            <label className="flex items-center gap-2 text-xs font-bold text-indigo-700 dark:text-indigo-400 cursor-pointer bg-indigo-50 dark:bg-indigo-900/40 px-3 py-1.5 rounded-lg border border-indigo-100 dark:border-indigo-800 transition-colors hover:bg-indigo-100 dark:hover:bg-indigo-800/60">
+                                                <input
+                                                    type="checkbox"
+                                                    checked={useStudentAsKey}
+                                                    onChange={(e) => setUseStudentAsKey(e.target.checked)}
+                                                    className="w-3.5 h-3.5 text-indigo-600 rounded"
+                                                />
+                                                Use a Student as Key
+                                            </label>
+
+                                            {!useStudentAsKey && (
+                                                <div className="flex items-center gap-2">
+                                                    {rubricFile && (
+                                                        <button
+                                                            onClick={() => setRubricFile(null)}
+                                                            className="text-xs bg-red-100 dark:bg-red-900/40 hover:bg-red-200 dark:hover:bg-red-800 text-red-700 dark:text-red-400 px-2 py-1.5 rounded-lg flex items-center gap-1 font-bold border border-red-200 dark:border-red-800 transition-colors z-10"
+                                                            title="Remove attached Answer Key"
+                                                        >
+                                                            <X className="w-3.5 h-3.5" /> Clear
+                                                        </button>
+                                                    )}
+                                                    <div className="relative">
+                                                        <input
+                                                            type="file"
+                                                            accept="image/*,.pdf"
+                                                            onChange={handleFileChange}
+                                                            className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+                                                        />
+                                                        <button type="button" className="text-xs bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 px-3 py-1.5 rounded-lg flex items-center gap-1.5 font-medium border border-slate-300 dark:border-slate-700 transition-colors">
+                                                            <FileText className="w-3.5 h-3.5 text-indigo-500" />
+                                                            <span className="max-w-[150px] truncate">{rubricFile ? rubricFile.name : "Upload File (PDF/Image)"}</span>
+                                                        </button>
+                                                    </div>
                                                 </div>
-                                            </div>
+                                            )}
                                         </div>
-                                        <textarea
-                                            value={rubric}
-                                            onChange={(e) => setRubric(e.target.value)}
-                                            placeholder="Paste the grading rubric or correct answers here, or upload a file above..."
-                                            className="w-full h-32 p-3 text-sm border border-slate-200 dark:border-slate-800 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none resize-y text-slate-800 dark:text-slate-200 placeholder:text-slate-400"
-                                        ></textarea>
+
+                                        {useStudentAsKey ? (
+                                            <div className="bg-indigo-50 dark:bg-indigo-900/20 p-4 rounded-xl border border-indigo-100 dark:border-indigo-800 mt-2">
+                                                <label className="block text-xs font-bold text-indigo-800 dark:text-indigo-300 mb-2 uppercase tracking-wide">Select Master Student</label>
+                                                <select
+                                                    value={keyStudentId}
+                                                    onChange={(e) => setKeyStudentId(e.target.value)}
+                                                    className="w-full p-2.5 text-sm font-semibold border-2 border-indigo-200 dark:border-indigo-700 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-200 shadow-sm"
+                                                >
+                                                    <option value="" disabled>-- Select a student who got 100% --</option>
+                                                    {submissions.map(sub => (
+                                                        <option key={sub.userId} value={sub.userId}>
+                                                            {sub.studentProfile?.name?.fullName || sub.userId}
+                                                        </option>
+                                                    ))}
+                                                </select>
+                                                <p className="text-xs text-indigo-600 dark:text-indigo-400 mt-2">Every other student will be graded based on how closely their answers match this selected student's work.</p>
+                                            </div>
+                                        ) : (
+                                            <textarea
+                                                value={rubric}
+                                                onChange={(e) => setRubric(e.target.value)}
+                                                placeholder="Paste the grading rubric or correct answers here, or upload a file above..."
+                                                className="w-full h-32 p-3 text-sm border border-slate-200 dark:border-slate-800 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none resize-y text-slate-800 dark:text-slate-200 placeholder:text-slate-400"
+                                            ></textarea>
+                                        )}
                                     </div>
 
                                     <button
