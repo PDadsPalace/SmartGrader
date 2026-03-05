@@ -20,6 +20,7 @@ export default function GradingWorkspace() {
     const [submissions, setSubmissions] = useState([]);
     const [selectedSubmission, setSelectedSubmission] = useState(null);
     const [assignmentName, setAssignmentName] = useState("");
+    const [courseName, setCourseName] = useState("");
 
     // Grading Controls
     const [rubric, setRubric] = useState("");
@@ -163,6 +164,9 @@ export default function GradingWorkspace() {
                     if (data.assignmentDetails) {
                         setAssignmentName(data.assignmentDetails.title || "");
                         setAssignmentInfo(data.assignmentDetails);
+                        if (data.assignmentDetails.courseName) {
+                            setCourseName(data.assignmentDetails.courseName);
+                        }
                     }
                     if (data.submissions?.length > 0) {
                         const firstSub = data.submissions[0];
@@ -744,9 +748,9 @@ export default function GradingWorkspace() {
                     >
                         <ArrowLeft className="w-5 h-5 group-hover:-translate-x-1 transition-transform" />
                     </button>
-                    <div className="min-w-0">
-                        <h1 className="text-lg font-bold text-slate-900 dark:text-slate-50 leading-tight truncate px-1">{assignmentName || "Grading Workspace"}</h1>
-                        <p className="text-xs text-slate-500 dark:text-slate-400 truncate px-1">Assignment ID: {assignmentId}</p>
+                    <div className="min-w-0 pr-4">
+                        <h2 className="text-[10px] font-black uppercase tracking-widest text-indigo-500 dark:text-indigo-400 mb-0.5">{courseName || "Loading Course..."}</h2>
+                        <h1 className="text-lg font-bold text-slate-900 dark:text-slate-50 leading-tight truncate">{assignmentName || "Grading Workspace"}</h1>
                     </div>
                 </div>
                 <div className="flex items-center gap-3">

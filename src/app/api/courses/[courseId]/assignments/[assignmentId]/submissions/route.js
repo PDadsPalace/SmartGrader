@@ -28,6 +28,11 @@ export async function GET(request, { params }) {
                 id: assignmentId,
             });
             assignmentDetails = cwRes.data;
+
+            const courseRes = await classroom.courses.get({
+                id: courseId,
+            });
+            assignmentDetails.courseName = courseRes.data.name;
         } catch (cwErr) {
             console.log("Could not fetch assignment name details", cwErr);
         }
