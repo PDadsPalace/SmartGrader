@@ -16,6 +16,14 @@ export default function CourseAssignments() {
     const [error, setError] = useState(null);
     const [gradedStatus, setGradedStatus] = useState({});
     const [averageGrades, setAverageGrades] = useState({});
+    const [filterMode, setFilterMode] = useState("All");
+
+    const filteredAssignments = assignments.filter(assignment => {
+        const isGraded = gradedStatus[assignment.id];
+        if (filterMode === "Graded") return isGraded;
+        if (filterMode === "Ungraded") return !isGraded;
+        return true;
+    });
 
     // Create Assignment Modal State
     const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
@@ -268,17 +276,28 @@ export default function CourseAssignments() {
                     </header>
 
                     <div className="p-8 max-w-6xl mx-auto">
-                        <div className="mb-8 flex justify-between items-end">
+                        <div className="mb-8 flex flex-col md:flex-row justify-between items-start md:items-end gap-4">
                             <div>
                                 <h1 className="text-3xl font-bold text-slate-900 dark:text-slate-50 mb-2">Active Assignments</h1>
                                 <p className="text-slate-500 dark:text-slate-400">Select an assignment to begin the AI grading process.</p>
                             </div>
-                            <button
-                                onClick={() => setIsCreateModalOpen(true)}
-                                className="bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2.5 rounded-xl text-sm font-bold transition-colors shadow-sm flex items-center gap-2 active:scale-95"
-                            >
-                                <Plus className="w-5 h-5" /> Create Assignment
-                            </button>
+                            <div className="flex items-center gap-4 w-full md:w-auto">
+                                <select
+                                    value={filterMode}
+                                    onChange={(e) => setFilterMode(e.target.value)}
+                                    className="bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-xl px-4 py-2 text-sm font-bold text-slate-700 dark:text-slate-300 outline-none focus:ring-2 focus:ring-indigo-500 shadow-sm"
+                                >
+                                    <option value="All">Show All</option>
+                                    <option value="Ungraded">Needs Grading</option>
+                                    <option value="Graded">Graded</option>
+                                </select>
+                                <button
+                                    onClick={() => setIsCreateModalOpen(true)}
+                                    className="bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2.5 rounded-xl text-sm font-bold transition-colors shadow-sm flex items-center gap-2 active:scale-95 whitespace-nowrap"
+                                >
+                                    <Plus className="w-5 h-5" /> Create
+                                </button>
+                            </div>
                         </div>
 
                         {error && (
@@ -293,9 +312,15 @@ export default function CourseAssignments() {
                                 <h3 className="text-xl font-bold text-slate-900 dark:text-slate-50 mb-2">All Caught Up!</h3>
                                 <p className="text-slate-500 dark:text-slate-400">There are no active or published assignments for this class right now.</p>
                             </div>
+                        ) : filteredAssignments.length === 0 && !error ? (
+                            <div className="text-center py-20 bg-white dark:bg-slate-950 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm">
+                                <CheckCircle2 className="w-16 h-16 text-indigo-400 dark:text-indigo-600 mx-auto mb-4 opacity-50" />
+                                <h3 className="text-xl font-bold text-slate-900 dark:text-slate-50 mb-2">No Matches</h3>
+                                <p className="text-slate-500 dark:text-slate-400">No assignments match your current filter ({filterMode}).</p>
+                            </div>
                         ) : (
                             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                                {assignments.map((assignment) => (
+                                {filteredAssignments.map((assignment) => (
                                     <div key={assignment.id} className="bg-white dark:bg-slate-950 rounded-2xl p-6 border border-slate-200 dark:border-slate-800 shadow-sm hover:shadow-md transition-all group flex flex-col h-full">
                                         <div className="flex-1">
                                             <div className="flex justify-between items-start mb-3">
