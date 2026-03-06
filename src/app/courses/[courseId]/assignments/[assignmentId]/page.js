@@ -26,7 +26,7 @@ export default function GradingWorkspace() {
     const [rubric, setRubric] = useState("");
     const [strictness, setStrictness] = useState(5); // 1 = Easy, 10 = Hard
     const [studentNotes, setStudentNotes] = useState("");
-    const [globalGradeFloor, setGlobalGradeFloor] = useState("");
+    const [studentGradeFloor, setStudentGradeFloor] = useState("");
     const [rubricFile, setRubricFile] = useState(null);
 
     // Active Submission Data
@@ -64,7 +64,9 @@ export default function GradingWorkspace() {
 
     // Bypass Features
     const [bypassMissingWork, setBypassMissingWork] = useState(false);
-    const [giveZeroMissingWork, setGiveZeroMissingWork] = useState(false);
+    const [missingWorkGrade, setMissingWorkGrade] = useState("0");
+    const [applyLatePenalty, setApplyLatePenalty] = useState(false);
+    const [latePenalty, setLatePenalty] = useState("10");
 
     useEffect(() => {
         if (status === "unauthenticated") {
@@ -93,11 +95,14 @@ export default function GradingWorkspace() {
             const savedBypass = localStorage.getItem(`bypassMissing_${assignmentName}`);
             if (savedBypass) setBypassMissingWork(savedBypass === 'true');
 
-            const savedZero = localStorage.getItem(`giveZero_${assignmentName}`);
-            if (savedZero) setGiveZeroMissingWork(savedZero === 'true');
+            const savedMissingGrade = localStorage.getItem(`missingWorkGrade_${assignmentName}`);
+            if (savedMissingGrade) setMissingWorkGrade(savedMissingGrade);
 
-            const savedFloor = localStorage.getItem(`global_floor_${assignmentName}`);
-            if (savedFloor) setGlobalGradeFloor(savedFloor);
+            const savedApplyLate = localStorage.getItem(`applyLatePenalty_${assignmentName}`);
+            if (savedApplyLate) setApplyLatePenalty(savedApplyLate === 'true');
+
+            const savedLatePenalty = localStorage.getItem(`latePenalty_${assignmentName}`);
+            if (savedLatePenalty) setLatePenalty(savedLatePenalty);
         }
     }, [assignmentName]);
 
@@ -112,10 +117,11 @@ export default function GradingWorkspace() {
                 localStorage.setItem(`rubricFile_${assignmentName}`, JSON.stringify(rubricFile));
             }
             localStorage.setItem(`bypassMissing_${assignmentName}`, bypassMissingWork);
-            localStorage.setItem(`giveZero_${assignmentName}`, giveZeroMissingWork);
-            localStorage.setItem(`global_floor_${assignmentName}`, globalGradeFloor);
+            localStorage.setItem(`missingWorkGrade_${assignmentName}`, missingWorkGrade);
+            localStorage.setItem(`applyLatePenalty_${assignmentName}`, applyLatePenalty);
+            localStorage.setItem(`latePenalty_${assignmentName}`, latePenalty);
         }
-    }, [rubric, strictness, rubricFile, bypassMissingWork, giveZeroMissingWork, globalGradeFloor, assignmentName]);
+    }, [rubric, strictness, rubricFile, bypassMissingWork, missingWorkGrade, applyLatePenalty, latePenalty, assignmentName]);
 
     // Save batchResults when they change
     useEffect(() => {
@@ -187,9 +193,11 @@ export default function GradingWorkspace() {
                     if (data.submissions?.length > 0) {
                         const firstSub = data.submissions[0];
                         setSelectedSubmission(firstSub);
-                        // Load saved student notes
+                        // Load saved student notes & floor
                         const savedNotes = localStorage.getItem(`student_notes_${firstSub.userId}`);
                         setStudentNotes(savedNotes || "");
+                        const savedFloor = localStorage.getItem(`student_floor_${firstSub.userId}`);
+                        setStudentGradeFloor(savedFloor || "");
                     }
                     setError(null);
                 })
@@ -275,15 +283,15 @@ export default function GradingWorkspace() {
                 let mockGrade = "50";
                 let mockFeedback = "Missing assignment. No file or text was submitted.";
 
-                if (giveZeroMissingWork) {
-                    mockGrade = "0";
+                if (bypassMissingWork) {
+                    mockGrade = missingWorkGrade || "0";
                 } else if (/\b0\b/.test(studentNotes) || /\bzero\b/i.test(studentNotes)) {
                     mockGrade = "0";
                 }
 
                 if (!bypassMissingWork) {
                     // Clamp Grade Floor for mockGrade
-                    const floorVal = parseFloat(globalGradeFloor);
+                    const floorVal = parseFloat(studentGradeFloor);
                     const returnedVal = parseFloat(mockGrade);
                     if (!isNaN(floorVal) && !isNaN(returnedVal) && returnedVal < floorVal) {
                         mockGrade = floorVal.toString();
@@ -343,9 +351,19 @@ export default function GradingWorkspace() {
 
             if (!res.ok) throw new Error(data.error || "Failed to generate AI grade.");
 
-            // Clamp Grade Floor
+            // Late Penalty
             let finalGradeCalculated = data.grade || "N/A";
-            const floorVal = parseFloat(globalGradeFloor);
+            const isLate = selectedSubmission.late || selectedSubmission.assignmentSubmission?.late;
+            if (isLate && applyLatePenalty) {
+                const penaltyVal = parseFloat(latePenalty);
+                const originalVal = parseFloat(finalGradeCalculated);
+                if (!isNaN(penaltyVal) && !isNaN(originalVal)) {
+                    finalGradeCalculated = Math.max(0, originalVal - penaltyVal).toString();
+                }
+            }
+
+            // Clamp Grade Floor
+            const floorVal = parseFloat(studentGradeFloor);
             const returnedVal = parseFloat(finalGradeCalculated);
             if (!isNaN(floorVal) && !isNaN(returnedVal) && returnedVal < floorVal) {
                 finalGradeCalculated = floorVal.toString();
@@ -605,17 +623,20 @@ export default function GradingWorkspace() {
                         let mockGrade = "50";
                         let mockFeedback = "Missing assignment. No file or text was submitted.";
 
-                        if (giveZeroMissingWork) {
-                            mockGrade = "0";
+                        if (bypassMissingWork) {
+                            mockGrade = missingWorkGrade || "0";
                         } else if (/\b0\b/.test(sNotes) || /\bzero\b/i.test(sNotes)) {
                             mockGrade = "0";
                         }
 
                         if (!bypassMissingWork) {
-                            const floorVal = parseFloat(globalGradeFloor);
-                            const returnedVal = parseFloat(mockGrade);
-                            if (!isNaN(floorVal) && !isNaN(returnedVal) && returnedVal < floorVal) {
-                                mockGrade = floorVal.toString();
+                            const sFloor = localStorage.getItem(`student_floor_${sub.userId}`);
+                            if (sFloor) {
+                                const floorVal = parseFloat(sFloor);
+                                const returnedVal = parseFloat(mockGrade);
+                                if (!isNaN(floorVal) && !isNaN(returnedVal) && returnedVal < floorVal) {
+                                    mockGrade = floorVal.toString();
+                                }
                             }
                         }
 
@@ -651,11 +672,24 @@ export default function GradingWorkspace() {
                     if (gradeRes.ok) {
                         let finalGradeCalculated = gradeData.grade || "N/A";
 
+                        // Late Penalty
+                        const isLate = sub.late || sub.assignmentSubmission?.late;
+                        if (isLate && applyLatePenalty) {
+                            const penaltyVal = parseFloat(latePenalty);
+                            const originalVal = parseFloat(finalGradeCalculated);
+                            if (!isNaN(penaltyVal) && !isNaN(originalVal)) {
+                                finalGradeCalculated = Math.max(0, originalVal - penaltyVal).toString();
+                            }
+                        }
+
                         // Clamp Grade Floor for Batch Process
-                        const floorVal = parseFloat(globalGradeFloor);
-                        const returnedVal = parseFloat(finalGradeCalculated);
-                        if (!isNaN(floorVal) && !isNaN(returnedVal) && returnedVal < floorVal) {
-                            finalGradeCalculated = floorVal.toString();
+                        const sFloor = localStorage.getItem(`student_floor_${sub.userId}`);
+                        if (sFloor) {
+                            const floorVal = parseFloat(sFloor);
+                            const returnedVal = parseFloat(finalGradeCalculated);
+                            if (!isNaN(floorVal) && !isNaN(returnedVal) && returnedVal < floorVal) {
+                                finalGradeCalculated = floorVal.toString();
+                            }
                         }
 
                         const resultObj = {
@@ -887,6 +921,8 @@ export default function GradingWorkspace() {
                                         setAiFeedback(batchResults[sub.id] || null);
                                         const savedNotes = localStorage.getItem(`student_notes_${sub.userId}`);
                                         setStudentNotes(savedNotes || "");
+                                        const savedFloor = localStorage.getItem(`student_floor_${sub.userId}`);
+                                        setStudentGradeFloor(savedFloor || "");
                                     }}
                                     className={`relative p-4 rounded-xl cursor-pointer border transition-all ${selectedSubmission?.id === sub.id ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-900/40 shadow-sm' : 'border-slate-100 dark:border-slate-800 hover:border-slate-300 dark:border-slate-700 hover:bg-slate-50'}`}
                                 >
@@ -897,9 +933,14 @@ export default function GradingWorkspace() {
                                     )}
                                     <div className="flex justify-between items-start mb-1">
                                         <span className="font-semibold text-slate-900 dark:text-slate-50">{sub.studentProfile?.name?.fullName || "Student Name"}</span>
-                                        {sub.state === "TURNED_IN" && (
-                                            <span className="text-[10px] uppercase tracking-wider font-bold bg-green-100 text-green-700 px-2 py-0.5 rounded-full">Submitted</span>
-                                        )}
+                                        <div className="flex gap-2">
+                                            {(sub.late || sub.assignmentSubmission?.late) && (
+                                                <span className="text-[10px] uppercase tracking-wider font-bold bg-red-100 text-red-700 px-2 py-0.5 rounded-full">Late</span>
+                                            )}
+                                            {sub.state === "TURNED_IN" && (
+                                                <span className="text-[10px] uppercase tracking-wider font-bold bg-green-100 text-green-700 px-2 py-0.5 rounded-full">Submitted</span>
+                                            )}
+                                        </div>
                                     </div>
                                     <div className="flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400 mb-2">
                                         <FileText className="w-3 h-3" />
@@ -1011,18 +1052,18 @@ export default function GradingWorkspace() {
                                                     className="w-full h-20 p-3 text-sm border border-slate-200 dark:border-slate-800 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none resize-y bg-yellow-50/30 text-slate-800 dark:text-slate-200 placeholder:text-slate-400"
                                                 ></textarea>
                                             </div>
-                                            <div className="w-48">
-                                                <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2 whitespace-nowrap">Global Grade Floor</label>
+                                            <div className="w-32">
+                                                <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">Grade Floor</label>
                                                 <input
                                                     type="number"
-                                                    value={globalGradeFloor}
+                                                    value={studentGradeFloor}
                                                     onChange={(e) => {
-                                                        setGlobalGradeFloor(e.target.value);
+                                                        setStudentGradeFloor(e.target.value);
+                                                        localStorage.setItem(`student_floor_${selectedSubmission.userId}`, e.target.value);
                                                     }}
                                                     placeholder="e.g. 50"
                                                     className="w-full h-20 p-3 text-center text-xl font-black border border-slate-200 dark:border-slate-800 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none bg-indigo-50/50 text-indigo-700 dark:text-indigo-400 placeholder:text-indigo-300 placeholder:font-normal placeholder:text-sm"
                                                 />
-                                                <div className="text-[10px] text-slate-500 mt-1 text-center font-semibold">Applies to all students</div>
                                             </div>
                                         </div>
                                     </div>
@@ -1041,23 +1082,47 @@ export default function GradingWorkspace() {
                                                 Use a Student as Key
                                             </label>
 
-                                            <label className="flex items-center gap-2 text-xs font-bold text-amber-700 dark:text-amber-400 cursor-pointer bg-amber-50 dark:bg-amber-900/40 px-3 py-1.5 rounded-lg border border-amber-100 dark:border-amber-800 transition-colors hover:bg-amber-100 dark:hover:bg-amber-800/60">
-                                                <input
-                                                    type="checkbox"
-                                                    checked={bypassMissingWork}
-                                                    onChange={(e) => {
-                                                        const checked = e.target.checked;
-                                                        setBypassMissingWork(checked);
-                                                        if (checked) {
-                                                            setGiveZeroMissingWork(true);
-                                                        } else {
-                                                            setGiveZeroMissingWork(false);
-                                                        }
-                                                    }}
-                                                    className="w-3.5 h-3.5 text-amber-600 rounded"
-                                                />
-                                                Give Missing Work a 0
-                                            </label>
+                                            <div className="flex gap-2">
+                                                <label className={`flex items-center gap-2 text-xs font-bold cursor-pointer px-3 py-1.5 rounded-lg border transition-colors ${bypassMissingWork ? 'bg-amber-100 border-amber-300 text-amber-800 dark:bg-amber-900/60 dark:border-amber-700 dark:text-amber-300' : 'bg-slate-50 border-slate-200 text-slate-600 dark:bg-slate-900/40 dark:border-slate-800 dark:text-slate-400 hover:bg-slate-100'}`}>
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={bypassMissingWork}
+                                                        onChange={(e) => setBypassMissingWork(e.target.checked)}
+                                                        className="w-3.5 h-3.5 text-amber-600 rounded"
+                                                    />
+                                                    Assign Specific Grade for Missing Work
+                                                </label>
+                                                {bypassMissingWork && (
+                                                    <input
+                                                        type="number"
+                                                        value={missingWorkGrade}
+                                                        onChange={(e) => setMissingWorkGrade(e.target.value)}
+                                                        className="w-16 p-1 text-center text-sm font-bold border border-amber-200 dark:border-amber-800 rounded-md focus:ring-2 focus:ring-amber-500 outline-none bg-white dark:bg-slate-900 text-amber-900 dark:text-amber-100"
+                                                        placeholder="0"
+                                                    />
+                                                )}
+                                            </div>
+
+                                            <div className="flex gap-2">
+                                                <label className={`flex items-center gap-2 text-xs font-bold cursor-pointer px-3 py-1.5 rounded-lg border transition-colors ${applyLatePenalty ? 'bg-red-100 border-red-300 text-red-800 dark:bg-red-900/60 dark:border-red-700 dark:text-red-300' : 'bg-slate-50 border-slate-200 text-slate-600 dark:bg-slate-900/40 dark:border-slate-800 dark:text-slate-400 hover:bg-slate-100'}`}>
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={applyLatePenalty}
+                                                        onChange={(e) => setApplyLatePenalty(e.target.checked)}
+                                                        className="w-3.5 h-3.5 text-red-600 rounded"
+                                                    />
+                                                    Deduct points for Late Work
+                                                </label>
+                                                {applyLatePenalty && (
+                                                    <input
+                                                        type="number"
+                                                        value={latePenalty}
+                                                        onChange={(e) => setLatePenalty(e.target.value)}
+                                                        className="w-16 p-1 text-center text-sm font-bold border border-red-200 dark:border-red-800 rounded-md focus:ring-2 focus:ring-red-500 outline-none bg-white dark:bg-slate-900 text-red-900 dark:text-red-100"
+                                                        placeholder="10"
+                                                    />
+                                                )}
+                                            </div>
 
                                             {!useStudentAsKey && (
                                                 <div className="flex items-center gap-2">
