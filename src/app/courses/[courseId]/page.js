@@ -4,6 +4,7 @@ import { useSession } from "next-auth/react";
 import { useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { BookOpen, GraduationCap, ArrowLeft, Calendar, FileText, CheckCircle2, Plus, X, Link as LinkIcon, Youtube, File as FileIcon } from "lucide-react";
+import useDrivePicker from "react-google-drive-picker";
 
 export default function CourseAssignments() {
     const { data: session, status } = useSession();
@@ -24,6 +25,32 @@ export default function CourseAssignments() {
         if (filterMode === "Ungraded") return !isGraded;
         return true;
     });
+
+    const [googleKeys, setGoogleKeys] = useState({ clientId: "", apiKey: "" });
+    const [openPicker, authResponse] = useDrivePicker();
+
+    const handleOpenPicker = () => {
+        if (!googleKeys.clientId || !session?.accessToken) return;
+        openPicker({
+            clientId: googleKeys.clientId,
+            developerKey: googleKeys.apiKey,
+            viewId: "DOCS",
+            token: session.accessToken,
+            showUploadView: true,
+            showUploadFolders: true,
+            supportDrives: true,
+            multiselect: true,
+            callbackFunction: (data) => {
+                if (data.action === "picked") {
+                    const newDocs = data.docs.map(doc => ({ url: doc.url, name: doc.name }));
+                    setCreateForm(prev => ({
+                        ...prev,
+                        attachments: [...prev.attachments, ...newDocs]
+                    }));
+                }
+            },
+        });
+    };
 
     // Create Assignment Modal State
     const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
@@ -214,6 +241,12 @@ export default function CourseAssignments() {
                 .then(data => setAvailableCourses(data.courses || []))
                 .catch(err => console.error("Failed to load available courses", err))
                 .finally(() => setFetchingCourses(false));
+
+            // Fetch Google Picker keys
+            fetch(`/api/config/google`)
+                .then(res => res.json())
+                .then(data => setGoogleKeys(data))
+                .catch(err => console.error("Failed to load generic google config", err));
         }
     }, [session, courseId]);
 
@@ -270,14 +303,22 @@ export default function CourseAssignments() {
 
                 {/* Main Content */}
                 <main className="flex-1 overflow-auto">
-                    <header className="h-16 flex items-center px-8 bg-white dark:bg-slate-950/50 backdrop-blur-sm border-b border-slate-200 dark:border-slate-800 sticky top-0 z-10 transition-all duration-200">
-                        <button
-                            onClick={() => router.push('/')}
-                            className="mr-4 p-2 rounded-full hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors text-slate-600 dark:text-slate-300 group flex items-center gap-2"
-                        >
-                            <ArrowLeft className="w-5 h-5 group-hover:-translate-x-1 transition-transform" />
-                            <span className="text-sm font-medium">Back to Classes</span>
-                        </button>
+                    <header className="h-16 flex items-center justify-between px-8 bg-white dark:bg-slate-950/50 backdrop-blur-sm border-b border-slate-200 dark:border-slate-800 sticky top-0 z-10 transition-all duration-200">
+                        <div className="flex items-center">
+                            <button
+                                onClick={() => router.push('/')}
+                                className="mr-4 p-2 rounded-full hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors text-slate-600 dark:text-slate-300 group flex items-center gap-2"
+                            >
+                                <ArrowLeft className="w-5 h-5 group-hover:-translate-x-1 transition-transform" />
+                                <span className="text-sm font-medium">Back to Classes</span>
+                            </button>
+                        </div>
+                        {availableCourses.find(c => String(c.id) === String(courseId)) && (
+                            <div className="font-bold text-slate-800 dark:text-slate-200">
+                                {availableCourses.find(c => String(c.id) === String(courseId)).name}
+                                {availableCourses.find(c => String(c.id) === String(courseId)).section && <span className="font-normal text-slate-500 ml-2">{availableCourses.find(c => String(c.id) === String(courseId)).section}</span>}
+                            </div>
+                        )}
                     </header>
 
                     <div className="p-8 max-w-6xl mx-auto">
@@ -591,13 +632,23 @@ export default function CourseAssignments() {
                                 <div className="pt-2 border-t border-slate-200 dark:border-slate-800">
                                     <div className="flex justify-between items-center mb-3">
                                         <label className="block text-sm font-bold text-slate-800 dark:text-slate-200">Attachments</label>
-                                        <button
-                                            type="button"
-                                            onClick={addAttachment}
-                                            className="text-xs font-bold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/40 hover:bg-indigo-100 dark:bg-indigo-900/60 px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition-colors"
-                                        >
-                                            <Plus className="w-3.5 h-3.5" /> Add Link
-                                        </button>
+                                        <div className="flex items-center gap-2">
+                                            <button
+                                                type="button"
+                                                onClick={handleOpenPicker}
+                                                disabled={!googleKeys.clientId}
+                                                className="text-xs font-bold text-slate-600 dark:text-slate-300 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition-colors disabled:opacity-50"
+                                            >
+                                                <FileIcon className="w-3.5 h-3.5" /> Google Drive
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={addAttachment}
+                                                className="text-xs font-bold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/40 hover:bg-indigo-100 dark:bg-indigo-900/60 px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition-colors"
+                                            >
+                                                <Plus className="w-3.5 h-3.5" /> Add Link
+                                            </button>
+                                        </div>
                                     </div>
 
                                     {createForm.attachments.length === 0 ? (
