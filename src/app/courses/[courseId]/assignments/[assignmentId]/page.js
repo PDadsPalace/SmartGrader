@@ -1069,86 +1069,62 @@ export default function GradingWorkspace() {
                                     </div>
 
                                     <div>
-                                        <div className="flex justify-between items-end mb-2">
+                                        <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
                                             <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300">Answer Key / Rubric</label>
 
-                                            <label className="flex items-center gap-2 text-xs font-bold text-indigo-700 dark:text-indigo-400 cursor-pointer bg-indigo-50 dark:bg-indigo-900/40 px-3 py-1.5 rounded-lg border border-indigo-100 dark:border-indigo-800 transition-colors hover:bg-indigo-100 dark:hover:bg-indigo-800/60">
-                                                <input
-                                                    type="checkbox"
-                                                    checked={useStudentAsKey}
-                                                    onChange={(e) => setUseStudentAsKey(e.target.checked)}
-                                                    className="w-3.5 h-3.5 text-indigo-600 rounded"
-                                                />
-                                                Use a Student as Key
-                                            </label>
-
-                                            <div className="flex gap-2">
-                                                <label className={`flex items-center gap-2 text-xs font-bold cursor-pointer px-3 py-1.5 rounded-lg border transition-colors ${bypassMissingWork ? 'bg-amber-100 border-amber-300 text-amber-800 dark:bg-amber-900/60 dark:border-amber-700 dark:text-amber-300' : 'bg-slate-50 border-slate-200 text-slate-600 dark:bg-slate-900/40 dark:border-slate-800 dark:text-slate-400 hover:bg-slate-100'}`}>
+                                            <div className="flex flex-wrap items-center gap-2">
+                                                <label className="flex items-center gap-2 text-xs font-bold text-indigo-700 dark:text-indigo-400 cursor-pointer bg-indigo-50 dark:bg-indigo-900/40 px-3 py-1.5 rounded-lg border border-indigo-100 dark:border-indigo-800 transition-colors hover:bg-indigo-100 dark:hover:bg-indigo-800/60">
                                                     <input
                                                         type="checkbox"
-                                                        checked={bypassMissingWork}
-                                                        onChange={(e) => setBypassMissingWork(e.target.checked)}
-                                                        className="w-3.5 h-3.5 text-amber-600 rounded"
+                                                        checked={useStudentAsKey}
+                                                        onChange={(e) => setUseStudentAsKey(e.target.checked)}
+                                                        className="w-3.5 h-3.5 text-indigo-600 rounded"
                                                     />
-                                                    Assign Specific Grade for Missing Work
+                                                    Use a Student as Key
                                                 </label>
-                                                {bypassMissingWork && (
-                                                    <input
-                                                        type="number"
-                                                        value={missingWorkGrade}
-                                                        onChange={(e) => setMissingWorkGrade(e.target.value)}
-                                                        className="w-16 p-1 text-center text-sm font-bold border border-amber-200 dark:border-amber-800 rounded-md focus:ring-2 focus:ring-amber-500 outline-none bg-white dark:bg-slate-900 text-amber-900 dark:text-amber-100"
-                                                        placeholder="0"
-                                                    />
-                                                )}
-                                            </div>
 
-                                            <div className="flex gap-2">
-                                                <label className={`flex items-center gap-2 text-xs font-bold cursor-pointer px-3 py-1.5 rounded-lg border transition-colors ${applyLatePenalty ? 'bg-red-100 border-red-300 text-red-800 dark:bg-red-900/60 dark:border-red-700 dark:text-red-300' : 'bg-slate-50 border-slate-200 text-slate-600 dark:bg-slate-900/40 dark:border-slate-800 dark:text-slate-400 hover:bg-slate-100'}`}>
-                                                    <input
-                                                        type="checkbox"
-                                                        checked={applyLatePenalty}
-                                                        onChange={(e) => setApplyLatePenalty(e.target.checked)}
-                                                        className="w-3.5 h-3.5 text-red-600 rounded"
-                                                    />
-                                                    Deduct points for Late Work
-                                                </label>
-                                                {applyLatePenalty && (
-                                                    <input
-                                                        type="number"
-                                                        value={latePenalty}
-                                                        onChange={(e) => setLatePenalty(e.target.value)}
-                                                        className="w-16 p-1 text-center text-sm font-bold border border-red-200 dark:border-red-800 rounded-md focus:ring-2 focus:ring-red-500 outline-none bg-white dark:bg-slate-900 text-red-900 dark:text-red-100"
-                                                        placeholder="10"
-                                                    />
-                                                )}
-                                            </div>
-
-                                            {!useStudentAsKey && (
-                                                <div className="flex items-center gap-2">
-                                                    {rubricFile && (
-                                                        <button
-                                                            onClick={() => setRubricFile(null)}
-                                                            className="text-xs bg-red-100 dark:bg-red-900/40 hover:bg-red-200 dark:hover:bg-red-800 text-red-700 dark:text-red-400 px-2 py-1.5 rounded-lg flex items-center gap-1 font-bold border border-red-200 dark:border-red-800 transition-colors z-10"
-                                                            title="Remove attached Answer Key"
-                                                        >
-                                                            <X className="w-3.5 h-3.5" /> Clear
-                                                        </button>
-                                                    )}
-                                                    <div className="relative">
+                                                <div className="flex gap-1.5">
+                                                    <label className={`flex items-center gap-2 text-xs font-bold cursor-pointer px-3 py-1.5 rounded-lg border transition-colors ${bypassMissingWork ? 'bg-amber-100 border-amber-300 text-amber-800 dark:bg-amber-900/60 dark:border-amber-700 dark:text-amber-300' : 'bg-slate-50 border-slate-200 text-slate-600 dark:bg-slate-900/40 dark:border-slate-800 dark:text-slate-400 hover:bg-slate-100'}`}>
                                                         <input
-                                                            type="file"
-                                                            accept="image/*,.pdf"
-                                                            onChange={handleFileChange}
-                                                            className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+                                                            type="checkbox"
+                                                            checked={bypassMissingWork}
+                                                            onChange={(e) => setBypassMissingWork(e.target.checked)}
+                                                            className="w-3.5 h-3.5 text-amber-600 rounded"
                                                         />
-                                                        <button type="button" className="text-xs bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 px-3 py-1.5 rounded-lg flex items-center gap-1.5 font-medium border border-slate-300 dark:border-slate-700 transition-colors">
-                                                            <FileText className="w-3.5 h-3.5 text-indigo-500" />
-                                                            <span className="max-w-[150px] truncate">{rubricFile ? rubricFile.name : "Upload File (PDF/Image)"}</span>
-                                                        </button>
-                                                    </div>
+                                                        Missing Work Grade
+                                                    </label>
+                                                    {bypassMissingWork && (
+                                                        <input
+                                                            type="number"
+                                                            value={missingWorkGrade}
+                                                            onChange={(e) => setMissingWorkGrade(e.target.value)}
+                                                            className="w-14 p-1 text-center text-sm font-bold border border-amber-200 dark:border-amber-800 rounded-md focus:ring-2 focus:ring-amber-500 outline-none bg-white dark:bg-slate-900 text-amber-900 dark:text-amber-100"
+                                                            placeholder="0"
+                                                        />
+                                                    )}
                                                 </div>
-                                            )}
+
+                                                <div className="flex gap-1.5">
+                                                    <label className={`flex items-center gap-2 text-xs font-bold cursor-pointer px-3 py-1.5 rounded-lg border transition-colors ${applyLatePenalty ? 'bg-red-100 border-red-300 text-red-800 dark:bg-red-900/60 dark:border-red-700 dark:text-red-300' : 'bg-slate-50 border-slate-200 text-slate-600 dark:bg-slate-900/40 dark:border-slate-800 dark:text-slate-400 hover:bg-slate-100'}`}>
+                                                        <input
+                                                            type="checkbox"
+                                                            checked={applyLatePenalty}
+                                                            onChange={(e) => setApplyLatePenalty(e.target.checked)}
+                                                            className="w-3.5 h-3.5 text-red-600 rounded"
+                                                        />
+                                                        Late Penalty
+                                                    </label>
+                                                    {applyLatePenalty && (
+                                                        <input
+                                                            type="number"
+                                                            value={latePenalty}
+                                                            onChange={(e) => setLatePenalty(e.target.value)}
+                                                            className="w-14 p-1 text-center text-sm font-bold border border-red-200 dark:border-red-800 rounded-md focus:ring-2 focus:ring-red-500 outline-none bg-white dark:bg-slate-900 text-red-900 dark:text-red-100"
+                                                            placeholder="10"
+                                                        />
+                                                    )}
+                                                </div>
+                                            </div>
                                         </div>
 
                                         {useStudentAsKey && (
@@ -1169,26 +1145,53 @@ export default function GradingWorkspace() {
                                                 <p className="text-xs text-indigo-600 dark:text-indigo-400 mt-2">Every other student will be graded based on how closely their answers match this selected student's work.</p>
                                             </div>
                                         )}
-                                        <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-2">{useStudentAsKey ? "Additional Instructions for AI (Optional)" : "Rubric / Answer Key Content"}</label>
                                         <textarea
                                             value={rubric}
                                             onChange={(e) => setRubric(e.target.value)}
-                                            placeholder={useStudentAsKey ? "e.g. Ignore minor spelling mistakes..." : "Paste the grading rubric or correct answers here, or upload a file above..."}
-                                            className="w-full h-32 p-3 text-sm border border-slate-200 dark:border-slate-800 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none resize-y text-slate-800 dark:text-slate-200 placeholder:text-slate-400"
+                                            placeholder={useStudentAsKey ? "e.g. Ignore minor spelling mistakes..." : "Paste the grading rubric or correct answers here..."}
+                                            className="w-full h-32 p-3 text-sm border border-slate-200 dark:border-slate-800 rounded-xl rounded-b-none border-b-0 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none resize-y text-slate-800 dark:text-slate-200 placeholder:text-slate-400"
                                         ></textarea>
-                                    </div>
 
-                                    <button
-                                        onClick={handleGradeWithAI}
-                                        disabled={grading}
-                                        className="w-full flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white py-3 rounded-xl font-bold transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-sm hover:shadow active:scale-[0.99]"
-                                    >
-                                        {grading ? (
-                                            <><div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div> Analyzing...</>
-                                        ) : (
-                                            <><Sparkles className="w-5 h-5" /> Generate AI Grade</>
-                                        )}
-                                    </button>
+                                        <div className="flex gap-3 items-center bg-slate-50 dark:bg-slate-900/50 p-3 rounded-b-xl border border-slate-200 dark:border-slate-800 -mt-1">
+                                            {!useStudentAsKey && (
+                                                <div className="flex items-center gap-2 shrink-0">
+                                                    {rubricFile && (
+                                                        <button
+                                                            onClick={() => setRubricFile(null)}
+                                                            className="text-xs bg-red-100 dark:bg-red-900/40 hover:bg-red-200 dark:hover:bg-red-800 text-red-700 dark:text-red-400 px-3 py-2.5 rounded-lg flex items-center gap-1 font-bold border border-red-200 dark:border-red-800 transition-colors z-10"
+                                                            title="Remove attached Answer Key"
+                                                        >
+                                                            <X className="w-3.5 h-3.5" /> Clear
+                                                        </button>
+                                                    )}
+                                                    <div className="relative">
+                                                        <input
+                                                            type="file"
+                                                            accept="image/*,.pdf"
+                                                            onChange={handleFileChange}
+                                                            className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+                                                        />
+                                                        <button type="button" className="text-sm bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 px-4 py-2.5 rounded-lg flex items-center gap-2 font-semibold border border-slate-300 dark:border-slate-700 transition-colors shadow-sm">
+                                                            <UploadCloud className="w-4 h-4 text-indigo-500" />
+                                                            <span className="max-w-[150px] truncate">{rubricFile ? rubricFile.name : "Attach File"}</span>
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            )}
+
+                                            <button
+                                                onClick={handleGradeWithAI}
+                                                disabled={grading}
+                                                className="flex-1 flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white py-2.5 px-4 rounded-lg font-bold transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-sm hover:shadow active:scale-[0.99]"
+                                            >
+                                                {grading ? (
+                                                    <><div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div> Analyzing...</>
+                                                ) : (
+                                                    <><Sparkles className="w-5 h-5" /> Generate AI Grade</>
+                                                )}
+                                            </button>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
 
