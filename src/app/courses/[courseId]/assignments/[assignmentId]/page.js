@@ -62,6 +62,10 @@ export default function GradingWorkspace() {
     const [keyStudentId, setKeyStudentId] = useState("");
     const [filterMode, setFilterMode] = useState("All");
 
+    // Bypass Features
+    const [bypassMissingWork, setBypassMissingWork] = useState(false);
+    const [giveZeroMissingWork, setGiveZeroMissingWork] = useState(false);
+
     useEffect(() => {
         if (status === "unauthenticated") {
             router.push("/");
@@ -85,6 +89,12 @@ export default function GradingWorkspace() {
                     console.error("Failed to parse rubric file from local storage", e);
                 }
             }
+
+            const savedBypass = localStorage.getItem(`bypassMissing_${assignmentName}`);
+            if (savedBypass) setBypassMissingWork(savedBypass === 'true');
+
+            const savedZero = localStorage.getItem(`giveZero_${assignmentName}`);
+            if (savedZero) setGiveZeroMissingWork(savedZero === 'true');
         }
     }, [assignmentName]);
 
@@ -98,8 +108,10 @@ export default function GradingWorkspace() {
             if (rubricFile) {
                 localStorage.setItem(`rubricFile_${assignmentName}`, JSON.stringify(rubricFile));
             }
+            localStorage.setItem(`bypassMissing_${assignmentName}`, bypassMissingWork);
+            localStorage.setItem(`giveZero_${assignmentName}`, giveZeroMissingWork);
         }
-    }, [rubric, strictness, rubricFile, assignmentName]);
+    }, [rubric, strictness, rubricFile, bypassMissingWork, giveZeroMissingWork, assignmentName]);
 
     // Save batchResults when they change
     useEffect(() => {
@@ -259,16 +271,21 @@ export default function GradingWorkspace() {
 
             if (isNotTurnedIn || (isTextEmpty && !inlineDataContent)) {
                 let mockGrade = "50";
-                if (/\b0\b/.test(studentNotes) || /\bzero\b/i.test(studentNotes)) {
+                let mockFeedback = "Missing assignment. No file or text was submitted.";
+
+                if (giveZeroMissingWork) {
+                    mockGrade = "0";
+                } else if (/\b0\b/.test(studentNotes) || /\bzero\b/i.test(studentNotes)) {
                     mockGrade = "0";
                 }
-                const mockFeedback = "Missing assignment. No file or text was submitted.";
 
-                // Clamp Grade Floor for mockGrade
-                const floorVal = parseFloat(studentGradeFloor);
-                const returnedVal = parseFloat(mockGrade);
-                if (!isNaN(floorVal) && !isNaN(returnedVal) && returnedVal < floorVal) {
-                    mockGrade = floorVal.toString();
+                if (!bypassMissingWork) {
+                    // Clamp Grade Floor for mockGrade
+                    const floorVal = parseFloat(studentGradeFloor);
+                    const returnedVal = parseFloat(mockGrade);
+                    if (!isNaN(floorVal) && !isNaN(returnedVal) && returnedVal < floorVal) {
+                        mockGrade = floorVal.toString();
+                    }
                 }
 
                 setAiFeedback({ grade: mockGrade, feedback: mockFeedback });
@@ -584,17 +601,22 @@ export default function GradingWorkspace() {
 
                     if (isNotTurnedIn || (isTextEmpty && !inlineDataForAI)) {
                         let mockGrade = "50";
-                        if (/\b0\b/.test(sNotes) || /\bzero\b/i.test(sNotes)) {
+                        let mockFeedback = "Missing assignment. No file or text was submitted.";
+
+                        if (giveZeroMissingWork) {
+                            mockGrade = "0";
+                        } else if (/\b0\b/.test(sNotes) || /\bzero\b/i.test(sNotes)) {
                             mockGrade = "0";
                         }
-                        const mockFeedback = "Missing assignment. No file or text was submitted.";
 
-                        const sFloor = localStorage.getItem(`student_floor_${sub.userId}`);
-                        if (sFloor) {
-                            const floorVal = parseFloat(sFloor);
-                            const returnedVal = parseFloat(mockGrade);
-                            if (!isNaN(floorVal) && !isNaN(returnedVal) && returnedVal < floorVal) {
-                                mockGrade = floorVal.toString();
+                        if (!bypassMissingWork) {
+                            const sFloor = localStorage.getItem(`student_floor_${sub.userId}`);
+                            if (sFloor) {
+                                const floorVal = parseFloat(sFloor);
+                                const returnedVal = parseFloat(mockGrade);
+                                if (!isNaN(floorVal) && !isNaN(returnedVal) && returnedVal < floorVal) {
+                                    mockGrade = floorVal.toString();
+                                }
                             }
                         }
 
@@ -1023,6 +1045,24 @@ export default function GradingWorkspace() {
                                                     className="w-3.5 h-3.5 text-indigo-600 rounded"
                                                 />
                                                 Use a Student as Key
+                                            </label>
+
+                                            <label className="flex items-center gap-2 text-xs font-bold text-amber-700 dark:text-amber-400 cursor-pointer bg-amber-50 dark:bg-amber-900/40 px-3 py-1.5 rounded-lg border border-amber-100 dark:border-amber-800 transition-colors hover:bg-amber-100 dark:hover:bg-amber-800/60">
+                                                <input
+                                                    type="checkbox"
+                                                    checked={bypassMissingWork}
+                                                    onChange={(e) => {
+                                                        const checked = e.target.checked;
+                                                        setBypassMissingWork(checked);
+                                                        if (checked) {
+                                                            setGiveZeroMissingWork(true);
+                                                        } else {
+                                                            setGiveZeroMissingWork(false);
+                                                        }
+                                                    }}
+                                                    className="w-3.5 h-3.5 text-amber-600 rounded"
+                                                />
+                                                Give Missing Work a 0
                                             </label>
 
                                             {!useStudentAsKey && (
