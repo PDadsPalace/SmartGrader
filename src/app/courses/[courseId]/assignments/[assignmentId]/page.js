@@ -26,7 +26,7 @@ export default function GradingWorkspace() {
     const [rubric, setRubric] = useState("");
     const [strictness, setStrictness] = useState(5); // 1 = Easy, 10 = Hard
     const [studentNotes, setStudentNotes] = useState("");
-    const [studentGradeFloor, setStudentGradeFloor] = useState("");
+    const [globalGradeFloor, setGlobalGradeFloor] = useState("");
     const [rubricFile, setRubricFile] = useState(null);
 
     // Active Submission Data
@@ -95,6 +95,9 @@ export default function GradingWorkspace() {
 
             const savedZero = localStorage.getItem(`giveZero_${assignmentName}`);
             if (savedZero) setGiveZeroMissingWork(savedZero === 'true');
+
+            const savedFloor = localStorage.getItem(`global_floor_${assignmentName}`);
+            if (savedFloor) setGlobalGradeFloor(savedFloor);
         }
     }, [assignmentName]);
 
@@ -110,8 +113,9 @@ export default function GradingWorkspace() {
             }
             localStorage.setItem(`bypassMissing_${assignmentName}`, bypassMissingWork);
             localStorage.setItem(`giveZero_${assignmentName}`, giveZeroMissingWork);
+            localStorage.setItem(`global_floor_${assignmentName}`, globalGradeFloor);
         }
-    }, [rubric, strictness, rubricFile, bypassMissingWork, giveZeroMissingWork, assignmentName]);
+    }, [rubric, strictness, rubricFile, bypassMissingWork, giveZeroMissingWork, globalGradeFloor, assignmentName]);
 
     // Save batchResults when they change
     useEffect(() => {
@@ -183,11 +187,9 @@ export default function GradingWorkspace() {
                     if (data.submissions?.length > 0) {
                         const firstSub = data.submissions[0];
                         setSelectedSubmission(firstSub);
-                        // Load saved student notes & floor
+                        // Load saved student notes
                         const savedNotes = localStorage.getItem(`student_notes_${firstSub.userId}`);
                         setStudentNotes(savedNotes || "");
-                        const savedFloor = localStorage.getItem(`student_floor_${firstSub.userId}`);
-                        setStudentGradeFloor(savedFloor || "");
                     }
                     setError(null);
                 })
@@ -281,7 +283,7 @@ export default function GradingWorkspace() {
 
                 if (!bypassMissingWork) {
                     // Clamp Grade Floor for mockGrade
-                    const floorVal = parseFloat(studentGradeFloor);
+                    const floorVal = parseFloat(globalGradeFloor);
                     const returnedVal = parseFloat(mockGrade);
                     if (!isNaN(floorVal) && !isNaN(returnedVal) && returnedVal < floorVal) {
                         mockGrade = floorVal.toString();
@@ -343,7 +345,7 @@ export default function GradingWorkspace() {
 
             // Clamp Grade Floor
             let finalGradeCalculated = data.grade || "N/A";
-            const floorVal = parseFloat(studentGradeFloor);
+            const floorVal = parseFloat(globalGradeFloor);
             const returnedVal = parseFloat(finalGradeCalculated);
             if (!isNaN(floorVal) && !isNaN(returnedVal) && returnedVal < floorVal) {
                 finalGradeCalculated = floorVal.toString();
@@ -610,13 +612,10 @@ export default function GradingWorkspace() {
                         }
 
                         if (!bypassMissingWork) {
-                            const sFloor = localStorage.getItem(`student_floor_${sub.userId}`);
-                            if (sFloor) {
-                                const floorVal = parseFloat(sFloor);
-                                const returnedVal = parseFloat(mockGrade);
-                                if (!isNaN(floorVal) && !isNaN(returnedVal) && returnedVal < floorVal) {
-                                    mockGrade = floorVal.toString();
-                                }
+                            const floorVal = parseFloat(globalGradeFloor);
+                            const returnedVal = parseFloat(mockGrade);
+                            if (!isNaN(floorVal) && !isNaN(returnedVal) && returnedVal < floorVal) {
+                                mockGrade = floorVal.toString();
                             }
                         }
 
@@ -653,13 +652,10 @@ export default function GradingWorkspace() {
                         let finalGradeCalculated = gradeData.grade || "N/A";
 
                         // Clamp Grade Floor for Batch Process
-                        const sFloor = localStorage.getItem(`student_floor_${sub.userId}`);
-                        if (sFloor) {
-                            const floorVal = parseFloat(sFloor);
-                            const returnedVal = parseFloat(finalGradeCalculated);
-                            if (!isNaN(floorVal) && !isNaN(returnedVal) && returnedVal < floorVal) {
-                                finalGradeCalculated = floorVal.toString();
-                            }
+                        const floorVal = parseFloat(globalGradeFloor);
+                        const returnedVal = parseFloat(finalGradeCalculated);
+                        if (!isNaN(floorVal) && !isNaN(returnedVal) && returnedVal < floorVal) {
+                            finalGradeCalculated = floorVal.toString();
                         }
 
                         const resultObj = {
@@ -891,8 +887,6 @@ export default function GradingWorkspace() {
                                         setAiFeedback(batchResults[sub.id] || null);
                                         const savedNotes = localStorage.getItem(`student_notes_${sub.userId}`);
                                         setStudentNotes(savedNotes || "");
-                                        const savedFloor = localStorage.getItem(`student_floor_${sub.userId}`);
-                                        setStudentGradeFloor(savedFloor || "");
                                     }}
                                     className={`relative p-4 rounded-xl cursor-pointer border transition-all ${selectedSubmission?.id === sub.id ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-900/40 shadow-sm' : 'border-slate-100 dark:border-slate-800 hover:border-slate-300 dark:border-slate-700 hover:bg-slate-50'}`}
                                 >
@@ -1017,18 +1011,18 @@ export default function GradingWorkspace() {
                                                     className="w-full h-20 p-3 text-sm border border-slate-200 dark:border-slate-800 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none resize-y bg-yellow-50/30 text-slate-800 dark:text-slate-200 placeholder:text-slate-400"
                                                 ></textarea>
                                             </div>
-                                            <div className="w-32">
-                                                <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">Grade Floor</label>
+                                            <div className="w-48">
+                                                <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2 whitespace-nowrap">Global Grade Floor</label>
                                                 <input
                                                     type="number"
-                                                    value={studentGradeFloor}
+                                                    value={globalGradeFloor}
                                                     onChange={(e) => {
-                                                        setStudentGradeFloor(e.target.value);
-                                                        localStorage.setItem(`student_floor_${selectedSubmission.userId}`, e.target.value);
+                                                        setGlobalGradeFloor(e.target.value);
                                                     }}
                                                     placeholder="e.g. 50"
                                                     className="w-full h-20 p-3 text-center text-xl font-black border border-slate-200 dark:border-slate-800 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none bg-indigo-50/50 text-indigo-700 dark:text-indigo-400 placeholder:text-indigo-300 placeholder:font-normal placeholder:text-sm"
                                                 />
+                                                <div className="text-[10px] text-slate-500 mt-1 text-center font-semibold">Applies to all students</div>
                                             </div>
                                         </div>
                                     </div>
