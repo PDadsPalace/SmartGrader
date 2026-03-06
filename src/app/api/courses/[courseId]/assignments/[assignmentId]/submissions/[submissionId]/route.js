@@ -76,6 +76,12 @@ export async function GET(request, { params }) {
         const driveAttachment = attachments.find(att => att.driveFile);
 
         if (!driveAttachment) {
+            // Check if they attached a Google Form as a generic 'Link' by mistake
+            const linkAttachment = courseWork.materials?.find(mat => mat.link?.url?.includes("docs.google.com/forms"));
+            if (linkAttachment) {
+                return NextResponse.json({ content: "Error: You attached the Google Form as a generic 'Link'. The AI cannot pull responses from a generic link due to Google's privacy rules. \n\nHow to fix:\n1. Go to Google Classroom and edit this assignment.\n2. Delete the link attachment.\n3. Click the 'Google Drive' icon 📂 to attach the Form directly from your Drive. This gives the AI the correct 'File ID' it needs to grade it." });
+            }
+
             return NextResponse.json({ content: "No Supported Attachments Found. Materials attached to assignment: " + JSON.stringify(courseWork.materials) });
         }
 
