@@ -25,3 +25,12 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+/* Fix Google Drive Picker Z-index to appear above Next.js z-50 modals */
+.picker-dialog {
+  z-index: 100005 !important;
+}
+
+.picker-dialog-bg {
+  z-index: 100004 !important;
+}
