@@ -352,7 +352,7 @@ export default function GradingWorkspace() {
             if (!res.ok) throw new Error(data.error || "Failed to generate AI grade.");
 
             // Late Penalty
-            let finalGradeCalculated = data.grade || "N/A";
+            let finalGradeCalculated = String(data.grade || "N/A").replace(/\/\s*100$/, '').trim();
             const isLate = selectedSubmission.late || selectedSubmission.assignmentSubmission?.late;
             if (isLate && applyLatePenalty) {
                 const penaltyVal = parseFloat(latePenalty);
@@ -666,7 +666,7 @@ export default function GradingWorkspace() {
                     const gradeData = await gradeRes.json();
 
                     if (gradeRes.ok) {
-                        let finalGradeCalculated = gradeData.grade || "N/A";
+                        let finalGradeCalculated = String(gradeData.grade || "N/A").replace(/\/\s*100$/, '').trim();
 
                         // Late Penalty
                         const isLate = sub.late || sub.assignmentSubmission?.late;
@@ -897,9 +897,28 @@ export default function GradingWorkspace() {
                                     className={`relative p-4 rounded-xl cursor-pointer border transition-all ${selectedSubmission?.id === sub.id ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-900/40 shadow-sm' : 'border-slate-100 dark:border-slate-800 hover:border-slate-300 dark:border-slate-700 hover:bg-slate-50'}`}
                                 >
                                     {batchResults[sub.id] && (
-                                        <div className="absolute top-0 right-0 -mt-2 -mr-2 bg-indigo-500 text-white px-2 py-0.5 min-w-[1.5rem] rounded-full flex items-center justify-center shadow-sm border-2 border-white text-xs font-bold z-10">
-                                            {batchResults[sub.id].grade}
-                                        </div>
+                                        <input
+                                            type="text"
+                                            value={String(batchResults[sub.id].grade).replace(/\/\s*100$/, '')}
+                                            onClick={(e) => { e.stopPropagation(); e.preventDefault(); }}
+                                            onKeyDown={(e) => e.stopPropagation()}
+                                            onChange={(e) => {
+                                                const val = e.target.value;
+                                                setBatchResults(prev => ({
+                                                    ...prev,
+                                                    [sub.id]: {
+                                                        ...prev[sub.id],
+                                                        grade: val
+                                                    }
+                                                }));
+                                                if (selectedSubmission?.id === sub.id) {
+                                                    setAiFeedback(prev => prev ? { ...prev, grade: val } : { grade: val, feedback: batchResults[sub.id].feedback });
+                                                }
+                                            }}
+                                            className="absolute top-0 right-0 -mt-2 -mr-2 z-10 bg-indigo-500 text-white w-9 h-6 text-center rounded-full shadow-sm border-2 border-white text-[11px] font-bold outline-none focus:ring-2 focus:ring-indigo-300 placeholder-white/70"
+                                            placeholder="--"
+                                            title="Edit Grade"
+                                        />
                                     )}
                                     <div className="flex justify-between items-start mb-1">
                                         <span className="font-semibold text-slate-900 dark:text-slate-50">{sub.studentProfile?.name?.fullName || "Student Name"}</span>
@@ -1276,7 +1295,7 @@ export default function GradingWorkspace() {
                                         <div className="flex items-center gap-3">
                                             <input
                                                 type="text"
-                                                value={aiFeedback.grade}
+                                                value={String(aiFeedback.grade).replace(/\/\s*100$/, '')}
                                                 onChange={(e) => {
                                                     const newGrade = e.target.value;
                                                     setAiFeedback({ ...aiFeedback, grade: newGrade });
