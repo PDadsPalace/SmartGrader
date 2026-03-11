@@ -148,7 +148,7 @@ export default function Home() {
             <div className="mx-auto bg-indigo-100 dark:bg-indigo-900/60 w-16 h-16 rounded-full flex items-center justify-center mb-4">
               <GraduationCap className="w-8 h-8 text-indigo-600 dark:text-indigo-400" />
             </div>
-            <h1 className="text-3xl font-bold tracking-tight text-slate-900 dark:text-slate-50">SmartGrader AI</h1>
+            <h1 className="text-3xl font-bold tracking-tight text-slate-900 dark:text-slate-50">ClassRoomApp</h1>
             <p className="text-slate-500 dark:text-slate-400 leading-relaxed">
               Connect your Google Classroom to get started with AI-assisted grading and automated PowerSchool exports.
             </p>
@@ -159,6 +159,11 @@ export default function Home() {
               <LogIn className="w-4 h-4" />
               Sign in with Google Account
             </button>
+            <div className="flex justify-center space-x-4 pt-4 text-sm text-slate-500">
+              <a href="/privacy" className="hover:text-slate-700 dark:hover:text-slate-300">Privacy Policy</a>
+              <span>&middot;</span>
+              <a href="/terms" className="hover:text-slate-700 dark:hover:text-slate-300">Terms of Service</a>
+            </div>
           </div>
         </div>
       </div>
@@ -173,7 +178,7 @@ export default function Home() {
         <div className="h-16 flex items-center px-6 border-b border-slate-100 dark:border-slate-800">
           <div className="flex items-center gap-2 text-indigo-600 dark:text-indigo-400 font-bold text-lg tracking-tight">
             <GraduationCap className="w-6 h-6" />
-            SmartGrader
+            ClassRoomApp
           </div>
         </div>
 
