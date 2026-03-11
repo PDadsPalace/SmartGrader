@@ -1183,6 +1183,28 @@ export default function GradingWorkspace() {
                                                 )}
                                             </div>
                                         </div>
+
+                                        {batchGrading && batchProgress.total > 0 && (
+                                            <div className="mt-4 p-5 bg-indigo-50/80 dark:bg-indigo-900/30 rounded-xl border border-indigo-100 dark:border-indigo-800 flex flex-col gap-3 animate-in slide-in-from-top-4 fade-in duration-300">
+                                                <div className="flex justify-between items-center">
+                                                    <span className="text-sm font-bold text-indigo-900 dark:text-indigo-200 flex items-center gap-2">
+                                                        <RefreshCw className="w-4 h-4 text-indigo-600 animate-spin" />
+                                                        AI Grading in Progress...
+                                                    </span>
+                                                    <span className="text-xs font-black text-indigo-700 dark:text-indigo-400 bg-white dark:bg-slate-950 px-3 py-1 rounded-lg border border-indigo-200 dark:border-indigo-800 shadow-sm">
+                                                        {batchProgress.current} / {batchProgress.total} Submissions
+                                                    </span>
+                                                </div>
+                                                <div className="w-full bg-white dark:bg-slate-950 rounded-full h-3 max-h-3 overflow-hidden shadow-inner border border-indigo-100 dark:border-indigo-800">
+                                                    <div 
+                                                        className="bg-indigo-600 dark:bg-indigo-500 h-full transition-all duration-300 ease-out relative"
+                                                        style={{ width: `${(batchProgress.current / batchProgress.total) * 100}%` }}
+                                                    >
+                                                        <div className="absolute inset-0 bg-white/20 animate-pulse"></div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        )}
                                     </div>
                                 </div>
                             </div>
