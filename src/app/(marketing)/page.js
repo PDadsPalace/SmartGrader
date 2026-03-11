@@ -8,7 +8,7 @@ export default function LandingPage() {
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                     <div className="flex justify-between h-16">
                         <div className="flex-shrink-0 flex items-center">
-                            <span className="text-blue-600 text-2xl font-bold">Autograder</span>
+                            <span className="text-blue-600 text-2xl font-bold">ClassRoomApp</span>
                         </div>
                         <div className="flex items-center space-x-4">
                             <Link href="/privacy" className="text-gray-500 hover:text-gray-700 px-3 py-2 rounded-md text-sm font-medium">
@@ -36,7 +36,7 @@ export default function LandingPage() {
                         <span className="block text-blue-600">with AI assistance</span>
                     </h1>
                     <p className="mt-3 max-w-md mx-auto text-base text-gray-500 sm:text-lg md:mt-5 md:text-xl md:max-w-3xl">
-                        Autograder seamlessly integrates with Google Classroom to help educators provide faster, more consistent feedback. Connect your account, select an assignment, and let AI do the heavy lifting of initial assessment.
+                        ClassRoomApp seamlessly integrates with Google Classroom to help educators provide faster, more consistent feedback. Connect your account, select an assignment, and let AI do the heavy lifting of initial assessment.
                     </p>
                     <div className="mt-5 max-w-md mx-auto sm:flex sm:justify-center md:mt-8">
                         <div className="rounded-md shadow">
@@ -69,7 +69,7 @@ export default function LandingPage() {
                                 Seamless Google Classroom Integration
                             </h3>
                             <p className="mt-3 text-lg text-gray-500">
-                                Autograder pulls in your active courses, assignments, and student rosters automatically. No need to manually create classes or import students.
+                                ClassRoomApp pulls in your active courses, assignments, and student rosters automatically. No need to manually create classes or import students.
                             </p>
 
                             <ul className="mt-10 space-y-10">
@@ -136,7 +136,7 @@ export default function LandingPage() {
                     </div>
                     <div className="mt-8 md:mt-0 md:order-1">
                         <p className="text-center text-base text-gray-400">
-                            &copy; {new Date().getFullYear()} Autograder. All rights reserved.
+                            &copy; {new Date().getFullYear()} ClassRoomApp. All rights reserved.
                         </p>
                     </div>
                 </div>
