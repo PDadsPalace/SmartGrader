@@ -3,7 +3,7 @@
 import { useSession } from "next-auth/react";
 import { useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
-import { BookOpen, GraduationCap, ArrowLeft, Calendar, FileText, CheckCircle2, Plus, X, Link as LinkIcon, Youtube, File as FileIcon } from "lucide-react";
+import { BookOpen, GraduationCap, ArrowLeft, Calendar, FileText, CheckCircle2, Plus, X, Link as LinkIcon, Youtube, File as FileIcon, RefreshCw } from "lucide-react";
 import useDrivePicker from "react-google-drive-picker";
 
 export default function CourseAssignments() {
@@ -73,6 +73,13 @@ export default function CourseAssignments() {
     const [hiddenCourseIds, setHiddenCourseIds] = useState([]);
     const [fetchingCourses, setFetchingCourses] = useState(false);
 
+    // Reuse Assignment State
+    const [isReuseModalOpen, setIsReuseModalOpen] = useState(false);
+    const [reuseSelectedCourse, setReuseSelectedCourse] = useState("");
+    const [reuseAssignments, setReuseAssignments] = useState([]);
+    const [fetchingReuseAssignments, setFetchingReuseAssignments] = useState(false);
+    const [reuseError, setReuseError] = useState(null);
+
     useEffect(() => {
         const savedHidden = localStorage.getItem("smartgrader_hidden_courses");
         if (savedHidden) {
@@ -103,6 +110,79 @@ export default function CourseAssignments() {
             newAttachments[index] = { ...newAttachments[index], url: value };
             return { ...prev, attachments: newAttachments };
         });
+    };
+
+    useEffect(() => {
+        if (isReuseModalOpen && reuseSelectedCourse) {
+            setFetchingReuseAssignments(true);
+            setReuseError(null);
+            fetch(`/api/courses/${reuseSelectedCourse}/assignments`)
+                .then(res => {
+                    if (!res.ok) throw new Error("Failed to fetch assignments");
+                    return res.json();
+                })
+                .then(data => {
+                    setReuseAssignments(data.assignments || []);
+                })
+                .catch(err => {
+                    console.error(err);
+                    setReuseError("Could not load past assignments.");
+                })
+                .finally(() => {
+                    setFetchingReuseAssignments(false);
+                });
+        }
+    }, [reuseSelectedCourse, isReuseModalOpen]);
+
+    const handleSelectReuseAssignment = (assignment) => {
+        let formattedDate = "";
+        if (assignment.dueDate && assignment.dueDate.year) {
+            const m = String(assignment.dueDate.month || 1).padStart(2, '0');
+            const d = String(assignment.dueDate.day || 1).padStart(2, '0');
+            formattedDate = `${assignment.dueDate.year}-${m}-${d}`;
+        }
+
+        let formattedTime = "";
+        if (assignment.dueTime && typeof assignment.dueTime.hours !== 'undefined') {
+            const h = String(assignment.dueTime.hours).padStart(2, '0');
+            const m = String(assignment.dueTime.minutes || 0).padStart(2, '0');
+            formattedTime = `${h}:${m}`;
+        }
+
+        const extractedAttachments = [];
+        if (assignment.materials && Array.isArray(assignment.materials)) {
+            assignment.materials.forEach(mat => {
+                let url = "";
+                if (mat.driveFile && mat.driveFile.driveFile) {
+                    url = mat.driveFile.driveFile.alternateLink || "";
+                } else if (mat.youtubeVideo) {
+                    url = mat.youtubeVideo.alternateLink || "";
+                } else if (mat.link) {
+                    url = mat.link.url || "";
+                } else if (mat.form) {
+                    url = mat.form.formUrl || "";
+                }
+
+                if (url) {
+                    extractedAttachments.push({ url });
+                }
+            });
+        }
+
+        setCreateForm({
+            title: assignment.title || "",
+            description: assignment.description || "",
+            maxPoints: assignment.maxPoints || 100,
+            dueDate: formattedDate,
+            dueTime: formattedTime,
+            attachments: extractedAttachments,
+            targetCourseIds: [courseId],
+            schedulePublish: false,
+            targetCourseSchedules: {}
+        });
+
+        setIsReuseModalOpen(false);
+        setIsCreateModalOpen(true);
     };
 
     const handleCreateSubmit = async (e) => {
@@ -337,6 +417,12 @@ export default function CourseAssignments() {
                                     <option value="Ungraded">Needs Grading</option>
                                     <option value="Graded">Graded</option>
                                 </select>
+                                <button
+                                    onClick={() => setIsReuseModalOpen(true)}
+                                    className="bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 px-4 py-2.5 rounded-xl text-sm font-bold transition-colors shadow-sm flex items-center gap-2 active:scale-95 whitespace-nowrap"
+                                >
+                                    <RefreshCw className="w-5 h-5" /> Reuse Assignment
+                                </button>
                                 <button
                                     onClick={() => setIsCreateModalOpen(true)}
                                     className="bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2.5 rounded-xl text-sm font-bold transition-colors shadow-sm flex items-center gap-2 active:scale-95 whitespace-nowrap"
@@ -713,6 +799,103 @@ export default function CourseAssignments() {
                                     )}
                                 </button>
                             </div>
+                        </div>
+                    </div>
+                )}
+
+            {/* Reuse Assignment Modal Overlay */}
+            {
+                isReuseModalOpen && (
+                    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4">
+                        <div className="bg-white dark:bg-slate-950 rounded-2xl shadow-xl w-full max-w-2xl max-h-[90vh] flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+
+                            {/* Modal Header */}
+                            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 dark:border-slate-800 bg-slate-50/50">
+                                <h2 className="text-lg font-bold text-slate-800 dark:text-slate-200 flex items-center gap-2">
+                                    <RefreshCw className="w-5 h-5 text-indigo-600 dark:text-indigo-400" /> Reuse Past Assignment
+                                </h2>
+                                <button
+                                    onClick={() => setIsReuseModalOpen(false)}
+                                    className="p-2 text-slate-400 hover:text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-lg transition-colors"
+                                >
+                                    <X className="w-5 h-5" />
+                                </button>
+                            </div>
+
+                            {/* Modal Body */}
+                            <div className="flex-1 overflow-y-auto p-6 space-y-6">
+                                {reuseError && (
+                                    <div className="p-3 bg-red-50 dark:bg-red-900/30 text-red-700 dark:text-red-400 text-sm rounded-lg border border-red-200 dark:border-red-800 font-medium">
+                                        {reuseError}
+                                    </div>
+                                )}
+
+                                <div className="space-y-2">
+                                    <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-1.5">1. Select a Class</label>
+                                    <select
+                                        value={reuseSelectedCourse}
+                                        onChange={(e) => setReuseSelectedCourse(e.target.value)}
+                                        className="w-full px-4 py-2.5 border border-slate-300 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all font-medium text-slate-900 dark:text-slate-50 bg-white dark:bg-slate-900 shadow-sm"
+                                    >
+                                        <option value="">-- Choose a Class --</option>
+                                        {availableCourses.filter(c => !hiddenCourseIds.includes(c.id)).map(course => (
+                                            <option key={course.id} value={course.id}>
+                                                {course.name} {course.section ? `- ${course.section}` : ''}
+                                            </option>
+                                        ))}
+                                    </select>
+                                </div>
+
+                                {reuseSelectedCourse && (
+                                    <div className="space-y-3 pt-2">
+                                        <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-1.5 flex items-center gap-2">
+                                            2. Select an Assignment
+                                            {fetchingReuseAssignments && (
+                                                <div className="w-3.5 h-3.5 rounded-full border-b-2 border-indigo-600 animate-spin" />
+                                            )}
+                                        </label>
+
+                                        {!fetchingReuseAssignments && reuseAssignments.length === 0 && !reuseError && (
+                                            <div className="text-center p-6 border border-dashed border-slate-300 dark:border-slate-700 rounded-xl bg-slate-50 dark:bg-slate-900/50">
+                                                <p className="text-sm font-medium text-slate-500 dark:text-slate-400">No published assignments found in this class.</p>
+                                            </div>
+                                        )}
+
+                                        <div className="grid grid-cols-1 gap-2 max-h-[350px] overflow-y-auto pr-1">
+                                            {reuseAssignments.map(assignment => (
+                                                <button
+                                                    key={assignment.id}
+                                                    onClick={() => handleSelectReuseAssignment(assignment)}
+                                                    className="w-full text-left p-4 rounded-xl border border-slate-200 dark:border-slate-800 hover:border-indigo-500 hover:bg-indigo-50/30 dark:hover:bg-indigo-900/20 transition-all group active:scale-[0.99]"
+                                                >
+                                                    <div className="flex justify-between items-start mb-1">
+                                                        <h4 className="font-bold text-slate-800 dark:text-slate-200 group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors line-clamp-1">
+                                                            {assignment.title}
+                                                        </h4>
+                                                        {assignment.maxPoints && (
+                                                            <span className="text-xs font-bold text-slate-500 whitespace-nowrap ml-2 bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded-md">
+                                                                {assignment.maxPoints} pts
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                    {assignment.description && (
+                                                        <p className="text-xs text-slate-500 dark:text-slate-400 line-clamp-2 mt-1.5 leading-relaxed">
+                                                            {assignment.description}
+                                                        </p>
+                                                    )}
+                                                    {assignment.materials && assignment.materials.length > 0 && (
+                                                        <div className="mt-2.5 flex items-center gap-2 text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide">
+                                                            <FileIcon className="w-3.5 h-3.5" />
+                                                            {assignment.materials.length} Attachment{assignment.materials.length !== 1 ? 's' : ''}
+                                                        </div>
+                                                    )}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+
                         </div>
                     </div>
                 )}
