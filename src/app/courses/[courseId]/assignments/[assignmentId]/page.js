@@ -897,28 +897,73 @@ export default function GradingWorkspace() {
                                     className={`relative p-4 rounded-xl cursor-pointer border transition-all ${selectedSubmission?.id === sub.id ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-900/40 shadow-sm' : 'border-slate-100 dark:border-slate-800 hover:border-slate-300 dark:border-slate-700 hover:bg-slate-50'}`}
                                 >
                                     {batchResults[sub.id] && (
-                                        <input
-                                            type="text"
-                                            value={String(batchResults[sub.id].grade).replace(/\/\s*100$/, '')}
-                                            onClick={(e) => { e.stopPropagation(); e.preventDefault(); }}
-                                            onKeyDown={(e) => e.stopPropagation()}
-                                            onChange={(e) => {
-                                                const val = e.target.value;
-                                                setBatchResults(prev => ({
-                                                    ...prev,
-                                                    [sub.id]: {
-                                                        ...prev[sub.id],
-                                                        grade: val
+                                        <div className="absolute top-0 right-0 -mt-2 -mr-2 z-10 flex items-center gap-1 bg-white dark:bg-slate-900 rounded-full shadow-sm border border-slate-200 dark:border-slate-700 p-0.5" onClick={(e) => e.stopPropagation()}>
+                                            <input
+                                                type="text"
+                                                value={String(batchResults[sub.id].grade).replace(/\/\s*100$/, '')}
+                                                onKeyDown={(e) => e.stopPropagation()}
+                                                onChange={(e) => {
+                                                    const val = e.target.value;
+                                                    setBatchResults(prev => ({
+                                                        ...prev,
+                                                        [sub.id]: {
+                                                            ...prev[sub.id],
+                                                            grade: val
+                                                        }
+                                                    }));
+                                                    if (selectedSubmission?.id === sub.id) {
+                                                        setAiFeedback(prev => prev ? { ...prev, grade: val } : { grade: val, feedback: batchResults[sub.id].feedback });
                                                     }
-                                                }));
-                                                if (selectedSubmission?.id === sub.id) {
-                                                    setAiFeedback(prev => prev ? { ...prev, grade: val } : { grade: val, feedback: batchResults[sub.id].feedback });
-                                                }
-                                            }}
-                                            className="absolute top-0 right-0 -mt-2 -mr-2 z-10 bg-indigo-500 text-white w-9 h-6 text-center rounded-full shadow-sm border-2 border-white text-[11px] font-bold outline-none focus:ring-2 focus:ring-indigo-300 placeholder-white/70"
-                                            placeholder="--"
-                                            title="Edit Grade"
-                                        />
+                                                }}
+                                                className="bg-indigo-500 text-white w-9 h-6 text-center rounded-full shadow-sm border-2 border-white text-[11px] font-bold outline-none focus:ring-2 focus:ring-indigo-300 placeholder-white/70"
+                                                placeholder="--"
+                                                title="Edit Grade"
+                                            />
+                                            <div className="flex flex-col pr-1">
+                                                <button
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        const current = parseFloat(batchResults[sub.id].grade) || 0;
+                                                        const updated = String(current + 1);
+                                                        setBatchResults(prev => ({
+                                                            ...prev,
+                                                            [sub.id]: {
+                                                                ...prev[sub.id],
+                                                                grade: updated
+                                                            }
+                                                        }));
+                                                        if (selectedSubmission?.id === sub.id) {
+                                                            setAiFeedback(prev => prev ? { ...prev, grade: updated } : { grade: updated, feedback: batchResults[sub.id].feedback });
+                                                        }
+                                                    }}
+                                                    className="text-[8px] leading-none text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 font-bold p-0.5 hover:bg-slate-100 dark:hover:bg-slate-800 rounded transition-colors block"
+                                                    title="Increase Grade"
+                                                >
+                                                    ▲
+                                                </button>
+                                                <button
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        const current = parseFloat(batchResults[sub.id].grade) || 0;
+                                                        const updated = String(Math.max(0, current - 1));
+                                                        setBatchResults(prev => ({
+                                                            ...prev,
+                                                            [sub.id]: {
+                                                                ...prev[sub.id],
+                                                                grade: updated
+                                                            }
+                                                        }));
+                                                        if (selectedSubmission?.id === sub.id) {
+                                                            setAiFeedback(prev => prev ? { ...prev, grade: updated } : { grade: updated, feedback: batchResults[sub.id].feedback });
+                                                        }
+                                                    }}
+                                                    className="text-[8px] leading-none text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 font-bold p-0.5 hover:bg-slate-100 dark:hover:bg-slate-800 rounded transition-colors block"
+                                                    title="Decrease Grade"
+                                                >
+                                                    ▼
+                                                </button>
+                                            </div>
+                                        </div>
                                     )}
                                     <div className="flex justify-between items-start mb-1">
                                         <span className="font-semibold text-slate-900 dark:text-slate-50">{sub.studentProfile?.name?.fullName || "Student Name"}</span>

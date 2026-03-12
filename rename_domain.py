@@ -10,7 +10,9 @@ replacements = {
 exclude_folders = [".git", ".next", "node_modules"]
 
 for root, dirs, files in os.walk(directories[0]):
-    dirs[:] = [d for d in dirs if d not in exclude_folders]
+    for d in list(dirs):
+        if d in exclude_folders:
+            dirs.remove(d)
     for file in files:
         if file.endswith((".js", ".jsx", ".json", ".md", ".css")):
             path = os.path.join(root, file)
