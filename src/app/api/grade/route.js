@@ -28,8 +28,8 @@ export async function POST(request) {
         const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
         const studentContext = studentNotes || "No specific instructions provided for this student.";
 
-        // Construct the Prompt
-        const prompt = `
+        // Construct the Prompt and System Instructions
+        const systemInstruction = `
 You are an expert high school teacher grading an assignment. You will evaluate the student's submission based on the provided rubric.
 
 **TEACHER INSTRUCTIONS / RUBRIC:**
@@ -42,23 +42,23 @@ ${studentContext}
 The teacher has requested a strictness level of: ${strictness}/10. 
 If the strictness is low, be very lenient and round up grades. If the strictness is high, be highly critical of minor errors.
 
-**STUDENT SUBMISSION:**
-"${submissionText}"
-(If a binary file was attached, it has been provided to you directly as a document context. Please read it to grade the assignment.)
-
-**MISSING WORK POLICY:**
-If the STUDENT SUBMISSION is exactly "Empty document or non-text attachment." and there is no binary file attached, this means the student did not submit any work or it is completely blank.
-In this case, you MUST give the student a default grade of 50. However, if the teacher's STUDENT CONTEXT notes explicitly state to give a 0 (or any other specific grade for missing work), you must follow the teacher's note instead.
+**CRITICAL MISSING WORK POLICY (READ CAREFULLY):**
+You MUST first determine if the student submitted any actual work. 
+If the STUDENT SUBMISSION is "Empty document or non-text attachment." OR if the attached binary file (like a PDF or image) is completely blank, contains only empty grids, has no text, or shows no meaningful attempt at the assignment, you MUST give the student a grade of exactly 0. 
+DO NOT grade them against the answer key if they submitted nothing. A blank file is a 0. Do NOT give a 100 for a blank document!
 
 **YOUR TASK:**
-Evaluate the submission. You must return your evaluation strictly in the following JSON format without any markdown blocks or extra text:
+Evaluate the submission. You must return your evaluation strictly in the following JSON format:
 {
-  "suggested_grade": "A text representation of the score (e.g. 85/100, B+, 4/5)",
+  "suggested_grade": "A number between 0 and 100 representing the score. YOU MUST return ONLY the raw integer (e.g., 85). DO NOT add '/100', DO NOT use a percent sign (%), DO NOT return a letter grade.",
   "feedback_text": "A paragraph of constructive feedback written directly to the student."
 }
 `;
 
-        let contentsData = [prompt];
+        const userPrompt = `**STUDENT SUBMISSION:**\n"${submissionText}"\n(If a binary file was attached, it has been provided to you directly as a document context. Please read it to grade the assignment.)`;
+
+
+        let contentsData = [userPrompt];
         if (rubricFile && rubricFile.data) {
             contentsData.push({
                 inlineData: {
@@ -80,17 +80,17 @@ Evaluate the submission. You must return your evaluation strictly in the followi
         const response = await ai.models.generateContent({
             model: 'gemini-2.5-flash',
             contents: contentsData,
+            config: {
+                systemInstruction: systemInstruction,
+                responseMimeType: "application/json"
+            }
         });
 
         // Parse the JSON string
         let parsedResult;
         try {
-            // Get the text from the response safely
             const textValue = typeof response.text === 'function' ? response.text() : response.text;
-
-            // Strip markdown blocks if Gemini accidentally includes them
-            let rawText = textValue.replace(/```json/gi, "").replace(/```/g, "").trim();
-            parsedResult = JSON.parse(rawText);
+            parsedResult = JSON.parse(textValue);
         } catch (parseError) {
             const textValue = typeof response.text === 'function' ? response.text() : response.text;
             console.error("Failed to parse Gemini JSON:", textValue, parseError);

@@ -66,23 +66,52 @@ export async function extractGoogleFormResponse(accessToken, formId, studentEmai
             );
         }
 
-        // 3b. Fallback matching using First and Last Name
+        // 3b. Fallback matching using First and Last Name (Strict)
         if (!studentFormResponse && studentName) {
-            const targetName = studentName.toLowerCase();
-            // Filter out initials or short parts to avoid false positives
-            const nameParts = targetName.split(' ').filter(p => p.length >= 3);
+            const targetNameClean = studentName.toLowerCase().replace(/[^a-z0-9]/g, '');
+            const targetParts = studentName.toLowerCase().split(' ').filter(p => p.length >= 3);
+            const reverseNameClean = targetParts.slice().reverse().join("");
+            
+            let bestMatchResponse = null;
+            let highestScore = 0;
 
-            if (nameParts.length > 0) {
-                studentFormResponse = allResponses.find(r => {
-                    const answersObj = r.answers || {};
-                    // Concatenate EVERY text answer the student submitted into one giant string
-                    const allTextInResponse = Object.values(answersObj)
-                        .map(a => a.textAnswers?.answers?.map(ans => ans.value.toLowerCase()).join(' ') || '')
-                        .join(' ');
-
-                    // Check if *all* parts of their name appear SOMEWHERE in their answers (e.g. typing Daniel in Q1, Figueroa in Q2)
-                    return nameParts.every(part => allTextInResponse.includes(part));
-                });
+            allResponses.forEach(r => {
+                let score = 0;
+                const answersObj = r.answers || {};
+                const textAnswers = Object.values(answersObj)
+                    .flatMap(a => a.textAnswers?.answers?.map(ans => ans.value.toLowerCase().trim()) || []);
+                
+                // Convert all answers to a concatenated squished string for absolute matching
+                const fullTextSquished = textAnswers.join("").replace(/[^a-z0-9]/g, '');
+                
+                // Method A: Perfect squished match forwards or backwards
+                if (targetNameClean.length > 3 && fullTextSquished.includes(targetNameClean)) {
+                    score += 100;
+                }
+                if (reverseNameClean && reverseNameClean.length > 3 && fullTextSquished.includes(reverseNameClean)) {
+                    score += 100;
+                }
+                
+                // Method B: Exact isolated word matches
+                const typedWords = textAnswers.flatMap(text => text.split(/[\s,.-]+/)).filter(w => w.length >= 3);
+                for (const part of targetParts) {
+                    if (typedWords.includes(part)) {
+                        score += 50; // They typed "Logan" distinctly
+                    } else if (typedWords.some(tw => tw.includes(part) || (part.length >= 5 && part.includes(tw)))) {
+                        // Very strict partial match: 'tw' includes 'logan' OR 'logan' includes 'logann'
+                        score += 10;
+                    }
+                }
+                
+                if (score > highestScore && score > 0) {
+                    highestScore = score;
+                    bestMatchResponse = r;
+                }
+            });
+            
+            // Require a threshold indicating at least one distinct naming match
+            if (highestScore >= 10) {
+                studentFormResponse = bestMatchResponse;
             }
         }
 
@@ -114,11 +143,35 @@ export async function extractGoogleFormResponse(accessToken, formId, studentEmai
 
             compiledText += `\n------------------------\n\n`;
         }
+        
+        // 5. Calculate Native Score if available
+        let autoGrade = null;
+        if (studentFormResponse.totalScore !== undefined) {
+            // Google Forms only gives us the totalScore achievable by summing the points in the questions
+            let maxPoints = 0;
+            form.items?.forEach(item => {
+                const points = item.questionItem?.question?.grading?.pointValue;
+                if (points) maxPoints += points;
+                
+                // Also check grid questions
+                item.questionGroupItem?.questions?.forEach(q => {
+                    const rowPoints = q.grading?.pointValue;
+                    if (rowPoints) maxPoints += rowPoints;
+                });
+            });
+            
+            if (maxPoints > 0) {
+                 // Calculate percentage 0-100 to match the rest of the application
+                 autoGrade = Math.round((studentFormResponse.totalScore / maxPoints) * 100).toString();
+                 compiledText = `[NATIVE GRADE: ${studentFormResponse.totalScore} / ${maxPoints} (${autoGrade}%)]\n\n` + compiledText;
+            }
+        }
 
         return {
             isBinary: false,
             mimeType: 'text/plain',
-            content: compiledText
+            content: compiledText,
+            nativeGrade: autoGrade // Pass this back so page.js can skip AI processing if desired
         };
 
     } catch (error) {

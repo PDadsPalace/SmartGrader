@@ -136,7 +136,38 @@ export default function GradingWorkspace() {
             const savedGrades = localStorage.getItem(`grades_${courseId}_${assignmentId}`);
             if (savedGrades) {
                 try {
-                    setBatchResults(JSON.parse(savedGrades));
+                    let parsedGrades = JSON.parse(savedGrades);
+                    
+                    // Retroactively sanitize any old grades that were saved as "90/100" or similar
+                    let sanitized = false;
+                    for (const [subId, data] of Object.entries(parsedGrades)) {
+                        if (data && data.grade) {
+                            let rawGrade = String(data.grade);
+                            // If it contains non-numeric chars (except dots), sanitize it
+                            if (/[^\d.]/.test(rawGrade) && rawGrade !== "Error" && rawGrade !== "N/A" && rawGrade !== "Missing") {
+                                let finalGrade = rawGrade;
+                                const fracMatch = rawGrade.match(/(\d+(?:\.\d+)?)\s*(?:\/|out of\s*)100|(\d+(?:\.\d+)?)%/i);
+                                if (fracMatch) {
+                                    finalGrade = fracMatch[1] || fracMatch[2];
+                                } else {
+                                    const numMatch = rawGrade.match(/\d+(?:\.\d+)?/);
+                                    if (numMatch) finalGrade = numMatch[0];
+                                }
+                                finalGrade = finalGrade.replace(/[^\d.]/g, '').trim();
+                                if (finalGrade && finalGrade !== rawGrade) {
+                                    parsedGrades[subId].grade = finalGrade;
+                                    sanitized = true;
+                                }
+                            }
+                        }
+                    }
+                    
+                    setBatchResults(parsedGrades);
+                    
+                    // If we found and fixed old dirty grades, re-save to localStorage
+                    if (sanitized) {
+                        localStorage.setItem(`grades_${courseId}_${assignmentId}`, JSON.stringify(parsedGrades));
+                    }
                 } catch (e) {
                     console.error("Failed to parse saved grades", e);
                 }
@@ -233,11 +264,17 @@ export default function GradingWorkspace() {
                         setSubmissionContent(data.data);
                         setSubmissionMime(data.mimeType);
                         setSubmissionIsBinary(data.isBinary);
+                        if (data.nativeGrade) {
+                            setSelectedSubmission(prev => ({ ...prev, nativeGrade: data.nativeGrade }));
+                        }
                     } else {
                         // Fallback handling if an old API response accidentally slips in
                         setSubmissionContent(data.content || "Empty document or non-text attachment.");
                         setSubmissionIsBinary(false);
                         setSubmissionMime("text/plain");
+                        if (data.nativeGrade) {
+                            setSelectedSubmission(prev => ({ ...prev, nativeGrade: data.nativeGrade }));
+                        }
                     }
 
                     // Clear major error if this succeeds (in case they just logged back in)
@@ -272,12 +309,30 @@ export default function GradingWorkspace() {
             }
 
             // Phase 8: Hardcode Missing Work Logic
-            const isNotTurnedIn = selectedSubmission.state !== "TURNED_IN";
+            const isFormSubmission = submissionTextOnly && submissionTextOnly.includes("Google Form Responses for:");
+            const isFormError = submissionTextOnly && (
+                submissionTextOnly.startsWith("Error:") || 
+                submissionTextOnly.startsWith("Fatal Error:") || 
+                submissionTextOnly.startsWith("No Supported Attachments Found") || 
+                submissionTextOnly.startsWith("No responses found")
+            );
+
+            const isNotTurnedIn = selectedSubmission.state !== "TURNED_IN" && !isFormSubmission && !isFormError;
             const isTextEmpty = !submissionTextOnly ||
                 submissionTextOnly === "Empty document or non-text attachment." ||
                 submissionTextOnly.includes("No attachments found") ||
                 submissionTextOnly.includes("none of them are Google Drive files") ||
-                !submissionTextOnly.trim();
+                submissionTextOnly.trim().length === 0;
+
+            if (isFormError) {
+                setAiFeedback({ grade: "Error", feedback: submissionTextOnly });
+                setBatchResults(prev => ({
+                    ...prev,
+                    [selectedSubmission.id]: { grade: "Error", feedback: submissionTextOnly }
+                }));
+                setGrading(false);
+                return;
+            }
 
             if (isNotTurnedIn || (isTextEmpty && !inlineDataContent)) {
                 let mockGrade = "50";
@@ -285,8 +340,8 @@ export default function GradingWorkspace() {
 
                 if (bypassMissingWork) {
                     mockGrade = missingWorkGrade || "0";
-                } else if (/\b0\b/.test(studentNotes) || /\bzero\b/i.test(studentNotes)) {
-                    mockGrade = "0";
+                } else {
+                    mockGrade = /\b0\b/.test(studentNotes) || /\bzero\b/i.test(studentNotes) ? "0" : "0"; // Changed default empty document grade to 0
                 }
 
                 if (!bypassMissingWork) {
@@ -305,6 +360,39 @@ export default function GradingWorkspace() {
                 }));
                 setGrading(false);
                 return; // Stop here, no API call
+            }
+            
+            // Phase 10: Auto-Apply Native Grades (Google Forms)
+            // If the document extractor yielded a nativeGrade, force it and skip AI.
+            // (Wait on document content fetcher to store nativeGrade first, we will update fetch block shortly)
+            if (selectedSubmission.nativeGrade !== undefined) {
+                 let finalNativeGrade = selectedSubmission.nativeGrade;
+                 let feedback = "Grade automatically imported from Google Forms native score. No AI analysis was run.";
+                 
+                 // Penalty logic
+                 const isLate = selectedSubmission.late || selectedSubmission.assignmentSubmission?.late;
+                 if (isLate && applyLatePenalty) {
+                     const penaltyVal = parseFloat(latePenalty);
+                     const originalVal = parseFloat(finalNativeGrade);
+                     if (!isNaN(penaltyVal) && !isNaN(originalVal)) {
+                         finalNativeGrade = Math.max(0, originalVal - penaltyVal).toString();
+                     }
+                 }
+                 
+                 // Clamp Floor logic
+                 const floorVal = parseFloat(studentGradeFloor);
+                 const returnedVal = parseFloat(finalNativeGrade);
+                 if (!isNaN(floorVal) && !isNaN(returnedVal) && returnedVal < floorVal) {
+                     finalNativeGrade = floorVal.toString();
+                 }
+                 
+                 setAiFeedback({ grade: finalNativeGrade, feedback });
+                 setBatchResults(prev => ({
+                     ...prev,
+                     [selectedSubmission.id]: { grade: finalNativeGrade, feedback }
+                 }));
+                 setGrading(false);
+                 return;
             }
 
             let runtimeRubric = rubric;
@@ -352,7 +440,27 @@ export default function GradingWorkspace() {
             if (!res.ok) throw new Error(data.error || "Failed to generate AI grade.");
 
             // Late Penalty
-            let finalGradeCalculated = String(data.grade || "N/A").replace(/\/\s*100$/, '').trim();
+            // Extract just the numerical value from the AI response (e.g., "A- (85/100)" -> "85")
+            let rawGrade = String(data.grade || "N/A");
+            let finalGradeCalculated = rawGrade;
+            
+            // First look for something formatted like "85%"
+            let percentMatch = rawGrade.match(/(\d+(?:\.\d+)?)%/);
+            if (percentMatch) {
+                finalGradeCalculated = percentMatch[1];
+            } else {
+                // Look for an exact whole number pattern (0 to 100) anywhere in the string
+                // ignoring any "92.5/100" style fractions
+                let numMatch = rawGrade.match(/\b([0-9]|[1-8][0-9]|9[0-9]|100)(?:\.\d+)?\b/);
+                if (numMatch) {
+                    finalGradeCalculated = numMatch[0];
+                }
+            }
+            
+            // Ensure no trailing spaces or non-numeric characters survived
+            finalGradeCalculated = finalGradeCalculated.replace(/[^\d.]/g, '').trim();
+            if (!finalGradeCalculated) finalGradeCalculated = "N/A";
+
             const isLate = selectedSubmission.late || selectedSubmission.assignmentSubmission?.late;
             if (isLate && applyLatePenalty) {
                 const penaltyVal = parseFloat(latePenalty);
@@ -559,7 +667,7 @@ export default function GradingWorkspace() {
 
         stopGradingRef.current = false;
         let completedCount = 0;
-        const CHUNK_SIZE = 5; // Process 5 students simultaneously
+        const CHUNK_SIZE = 10; // Process 10 students simultaneously
 
         for (let i = 0; i < submissions.length; i += CHUNK_SIZE) {
             if (stopGradingRef.current) break;
@@ -610,12 +718,34 @@ export default function GradingWorkspace() {
                     const sNotes = localStorage.getItem(`student_notes_${sub.userId}`) || "";
 
                     const isFormSubmission = submissionTextForAI && submissionTextForAI.includes("Google Form Responses for:");
-                    const isNotTurnedIn = sub.state !== "TURNED_IN" && !isFormSubmission;
+                    const isFormError = submissionTextForAI && (
+                        submissionTextForAI.startsWith("Error:") || 
+                        submissionTextForAI.startsWith("Fatal Error:") || 
+                        submissionTextForAI.startsWith("No responses found")
+                    );
+
+                    const isNotTurnedIn = sub.state !== "TURNED_IN" && !isFormSubmission && !isFormError;
+                    
+                    // Check if a binary file was attached but is extremely small (e.g., blank PDF converted from blank sheet)
+                    const isBlankBinary = inlineDataForAI && inlineDataForAI.data && inlineDataForAI.data.length < 5000;
+
                     const isTextEmpty = !submissionTextForAI ||
                         submissionTextForAI === "Empty document or non-text attachment." ||
                         submissionTextForAI.includes("No attachments found") ||
                         submissionTextForAI.includes("none of them are Google Drive files") ||
-                        !submissionTextForAI.trim();
+                        submissionTextForAI.startsWith("No Supported Attachments Found") ||
+                        submissionTextForAI.trim().length === 0 ||
+                        isBlankBinary;
+
+                    if (isFormError) {
+                        const resultObj = { grade: "Error", feedback: submissionTextForAI };
+                        setBatchResults(prev => ({ ...prev, [sub.id]: resultObj }));
+
+                        if (selectedSubmission && selectedSubmission.id === sub.id) {
+                            setAiFeedback(resultObj);
+                        }
+                        return; // Skip the API call for this student
+                    }
 
                     if (isNotTurnedIn || (isTextEmpty && !inlineDataForAI)) {
                         let mockGrade = "50";
@@ -623,8 +753,8 @@ export default function GradingWorkspace() {
 
                         if (bypassMissingWork) {
                             mockGrade = missingWorkGrade || "0";
-                        } else if (/\b0\b/.test(sNotes) || /\bzero\b/i.test(sNotes)) {
-                            mockGrade = "0";
+                        } else {
+                            mockGrade = /\b0\b/.test(sNotes) || /\bzero\b/i.test(sNotes) ? "0" : "0"; // Changed default empty document grade to 0
                         }
 
                         if (!bypassMissingWork) {
@@ -646,6 +776,39 @@ export default function GradingWorkspace() {
                         }
                         return; // Skip the API call for this student
                     }
+                    
+                    if (docData.nativeGrade !== undefined) {
+                         let finalNativeGrade = docData.nativeGrade;
+                         let feedback = "Grade automatically imported from Google Forms native score. No AI analysis was run.";
+                         
+                         // Penalty logic
+                         const isLate = sub.late || sub.assignmentSubmission?.late;
+                         if (isLate && applyLatePenalty) {
+                             const penaltyVal = parseFloat(latePenalty);
+                             const originalVal = parseFloat(finalNativeGrade);
+                             if (!isNaN(penaltyVal) && !isNaN(originalVal)) {
+                                 finalNativeGrade = Math.max(0, originalVal - penaltyVal).toString();
+                             }
+                         }
+                         
+                         // Clamp Floor logic
+                         const sFloor = localStorage.getItem(`student_floor_${sub.userId}`);
+                         if (sFloor) {
+                             const floorVal = parseFloat(sFloor);
+                             const returnedVal = parseFloat(finalNativeGrade);
+                             if (!isNaN(floorVal) && !isNaN(returnedVal) && returnedVal < floorVal) {
+                                 finalNativeGrade = floorVal.toString();
+                             }
+                         }
+                         
+                         const resultObj = { grade: finalNativeGrade, feedback };
+                         setBatchResults(prev => ({ ...prev, [sub.id]: resultObj }));
+        
+                         if (selectedSubmission && selectedSubmission.id === sub.id) {
+                             setAiFeedback(resultObj);
+                         }
+                         return; // Skip AI call
+                    }
 
                     // 2. Grade
                     const gradeRes = await fetch('/api/grade', {
@@ -666,7 +829,26 @@ export default function GradingWorkspace() {
                     const gradeData = await gradeRes.json();
 
                     if (gradeRes.ok) {
-                        let finalGradeCalculated = String(gradeData.grade || "N/A").replace(/\/\s*100$/, '').trim();
+                        // Extract just the numerical value from the AI response (e.g., "A- (85/100)" -> "85")
+                        let rawGrade = String(gradeData.grade || "N/A");
+                        let finalGradeCalculated = rawGrade;
+                        
+                        // First look for something formatted like "85%"
+                        let percentMatch = rawGrade.match(/(\d+(?:\.\d+)?)%/);
+                        if (percentMatch) {
+                            finalGradeCalculated = percentMatch[1];
+                        } else {
+                            // Look for an exact whole number pattern (0 to 100) anywhere in the string
+                            // ignoring any "92.5/100" style fractions
+                            let numMatch = rawGrade.match(/\b([0-9]|[1-8][0-9]|9[0-9]|100)(?:\.\d+)?\b/);
+                            if (numMatch) {
+                                finalGradeCalculated = numMatch[0];
+                            }
+                        }
+                        
+                        // Ensure no trailing spaces or non-numeric characters survived
+                        finalGradeCalculated = finalGradeCalculated.replace(/[^\d.]/g, '').trim();
+                        if (!finalGradeCalculated) finalGradeCalculated = "N/A";
 
                         // Late Penalty
                         const isLate = sub.late || sub.assignmentSubmission?.late;
@@ -798,7 +980,9 @@ export default function GradingWorkspace() {
                     </button>
                     <div className="min-w-0 pr-4">
                         <h2 className="text-[10px] font-black uppercase tracking-widest text-indigo-500 dark:text-indigo-400 mb-0.5">{courseName || "Loading Course..."}</h2>
-                        <h1 className="text-lg font-bold text-slate-900 dark:text-slate-50 leading-tight truncate">{assignmentName || "Grading Workspace"}</h1>
+                        <h1 className="text-lg font-bold text-slate-900 dark:text-slate-50 leading-tight truncate">
+                            {assignmentName || "Grading Workspace"} <span className="text-xs text-indigo-500 ml-2 bg-indigo-50 px-2 py-1 rounded">v3.0</span>
+                        </h1>
                     </div>
                 </div>
                 <div className="flex items-center gap-3">
@@ -900,7 +1084,7 @@ export default function GradingWorkspace() {
                                         <div className="absolute top-0 right-0 -mt-2 -mr-2 z-10 flex items-center gap-1 bg-white dark:bg-slate-900 rounded-full shadow-sm border border-slate-200 dark:border-slate-700 p-0.5" onClick={(e) => e.stopPropagation()}>
                                             <input
                                                 type="text"
-                                                value={String(batchResults[sub.id].grade).replace(/\/\s*100$/, '')}
+                                                value={String(batchResults[sub.id].grade).replace(/\s*\/.*$/, '').trim()}
                                                 onKeyDown={(e) => e.stopPropagation()}
                                                 onChange={(e) => {
                                                     const val = e.target.value;
