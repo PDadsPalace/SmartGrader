@@ -667,7 +667,7 @@ export default function GradingWorkspace() {
 
         stopGradingRef.current = false;
         let completedCount = 0;
-        const CHUNK_SIZE = 10; // Process 10 students simultaneously
+        const CHUNK_SIZE = 20; // Process 20 students simultaneously
 
         for (let i = 0; i < submissions.length; i += CHUNK_SIZE) {
             if (stopGradingRef.current) break;
@@ -981,7 +981,7 @@ export default function GradingWorkspace() {
                     <div className="min-w-0 pr-4">
                         <h2 className="text-[10px] font-black uppercase tracking-widest text-indigo-500 dark:text-indigo-400 mb-0.5">{courseName || "Loading Course..."}</h2>
                         <h1 className="text-lg font-bold text-slate-900 dark:text-slate-50 leading-tight truncate">
-                            {assignmentName || "Grading Workspace"} <span className="text-xs text-indigo-500 ml-2 bg-indigo-50 px-2 py-1 rounded">v3.0</span>
+                            {assignmentName || "Grading Workspace"} <span className="text-xs text-indigo-500 ml-2 bg-indigo-50 px-2 py-1 rounded">v3.1</span>
                         </h1>
                     </div>
                 </div>

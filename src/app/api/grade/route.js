@@ -55,7 +55,22 @@ Evaluate the submission. You must return your evaluation strictly in the followi
 }
 `;
 
-        const userPrompt = `**STUDENT SUBMISSION:**\n"${submissionText}"\n(If a binary file was attached, it has been provided to you directly as a document context. Please read it to grade the assignment.)`;
+        const userPrompt = `
+=========================================
+--- START OF ACTUAL STUDENT SUBMISSION ---
+=========================================
+
+TEXT SUBMISSION:
+"${submissionText}"
+
+(If a binary file was attached, it has been provided to you alongside this text as a document context. Please read it to grade the assignment.)
+
+CRITICAL REMINDER: Look closely at the student's file and text. If both are completely blank, unreadable, or show no attempt at the assignment, YOU MUST RETURN EXACTLY 0. DO NOT grade the Master Answer Key instead!
+
+=========================================
+--- END OF STUDENT SUBMISSION ---
+=========================================
+`;
 
 
         let contentsData = [userPrompt];
