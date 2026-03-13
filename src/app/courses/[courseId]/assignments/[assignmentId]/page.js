@@ -718,12 +718,14 @@ export default function GradingWorkspace() {
                     const sNotes = localStorage.getItem(`student_notes_${sub.userId}`) || "";
 
                     const isFormSubmission = submissionTextForAI && submissionTextForAI.includes("Google Form Responses for:");
+                    const isMissingFormError = submissionTextForAI && submissionTextForAI.startsWith("Error: Could not find a Google Form submission");
+                    
                     const isFormError = submissionTextForAI && (
-                        submissionTextForAI.startsWith("Error:") || 
+                        submissionTextForAI.startsWith("Error:") && !isMissingFormError || 
                         submissionTextForAI.startsWith("Fatal Error:")
                     );
 
-                    const isNotTurnedIn = sub.state !== "TURNED_IN" && !isFormSubmission && !isFormError;
+                    const isNotTurnedIn = sub.state !== "TURNED_IN" && !isFormSubmission && !isFormError && !isMissingFormError;
                     
                     // Check if a binary file was attached but is extremely small (e.g., blank PDF converted from blank sheet)
                     const isBlankBinary = inlineDataForAI && inlineDataForAI.data && inlineDataForAI.data.length < 25000;
@@ -734,6 +736,7 @@ export default function GradingWorkspace() {
                         submissionTextForAI.includes("none of them are Google Drive files") ||
                         submissionTextForAI.startsWith("No Supported Attachments Found") ||
                         submissionTextForAI.startsWith("No responses found") ||
+                        isMissingFormError ||
                         submissionTextForAI.trim().length === 0 ||
                         isBlankBinary;
 
@@ -981,7 +984,7 @@ export default function GradingWorkspace() {
                     <div className="min-w-0 pr-4">
                         <h2 className="text-[10px] font-black uppercase tracking-widest text-indigo-500 dark:text-indigo-400 mb-0.5">{courseName || "Loading Course..."}</h2>
                         <h1 className="text-lg font-bold text-slate-900 dark:text-slate-50 leading-tight truncate">
-                            {assignmentName || "Grading Workspace"} <span className="text-xs text-indigo-500 ml-2 bg-indigo-50 px-2 py-1 rounded">v3.3</span>
+                            {assignmentName || "Grading Workspace"} <span className="text-xs text-indigo-500 ml-2 bg-indigo-50 px-2 py-1 rounded">v3.4</span>
                         </h1>
                     </div>
                 </div>
