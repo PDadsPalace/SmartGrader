@@ -720,20 +720,20 @@ export default function GradingWorkspace() {
                     const isFormSubmission = submissionTextForAI && submissionTextForAI.includes("Google Form Responses for:");
                     const isFormError = submissionTextForAI && (
                         submissionTextForAI.startsWith("Error:") || 
-                        submissionTextForAI.startsWith("Fatal Error:") || 
-                        submissionTextForAI.startsWith("No responses found")
+                        submissionTextForAI.startsWith("Fatal Error:")
                     );
 
                     const isNotTurnedIn = sub.state !== "TURNED_IN" && !isFormSubmission && !isFormError;
                     
                     // Check if a binary file was attached but is extremely small (e.g., blank PDF converted from blank sheet)
-                    const isBlankBinary = inlineDataForAI && inlineDataForAI.data && inlineDataForAI.data.length < 5000;
+                    const isBlankBinary = inlineDataForAI && inlineDataForAI.data && inlineDataForAI.data.length < 25000;
 
                     const isTextEmpty = !submissionTextForAI ||
                         submissionTextForAI === "Empty document or non-text attachment." ||
                         submissionTextForAI.includes("No attachments found") ||
                         submissionTextForAI.includes("none of them are Google Drive files") ||
                         submissionTextForAI.startsWith("No Supported Attachments Found") ||
+                        submissionTextForAI.startsWith("No responses found") ||
                         submissionTextForAI.trim().length === 0 ||
                         isBlankBinary;
 
@@ -747,14 +747,14 @@ export default function GradingWorkspace() {
                         return; // Skip the API call for this student
                     }
 
-                    if (isNotTurnedIn || (isTextEmpty && !inlineDataForAI)) {
+                    if (isNotTurnedIn || isTextEmpty) {
                         let mockGrade = "50";
                         let mockFeedback = "Missing assignment. No file or text was submitted.";
 
                         if (bypassMissingWork) {
                             mockGrade = missingWorkGrade || "0";
                         } else {
-                            mockGrade = /\b0\b/.test(sNotes) || /\bzero\b/i.test(sNotes) ? "0" : "0"; // Changed default empty document grade to 0
+                            mockGrade = /\b0\b/.test(sNotes) || /\bzero\b/i.test(sNotes) ? "0" : "50"; // Changed default empty document grade back to 50
                         }
 
                         if (!bypassMissingWork) {
@@ -981,7 +981,7 @@ export default function GradingWorkspace() {
                     <div className="min-w-0 pr-4">
                         <h2 className="text-[10px] font-black uppercase tracking-widest text-indigo-500 dark:text-indigo-400 mb-0.5">{courseName || "Loading Course..."}</h2>
                         <h1 className="text-lg font-bold text-slate-900 dark:text-slate-50 leading-tight truncate">
-                            {assignmentName || "Grading Workspace"} <span className="text-xs text-indigo-500 ml-2 bg-indigo-50 px-2 py-1 rounded">v3.1</span>
+                            {assignmentName || "Grading Workspace"} <span className="text-xs text-indigo-500 ml-2 bg-indigo-50 px-2 py-1 rounded">v3.3</span>
                         </h1>
                     </div>
                 </div>
