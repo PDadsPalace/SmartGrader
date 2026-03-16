@@ -26,19 +26,45 @@ export async function extractGoogleFormResponse(accessToken, formId, studentEmai
         }
 
         const questionMap = {};
+        let maxAutoPoints = 0;
+        let maxManualPoints = 0;
+
         form.items.forEach(item => {
             if (item.questionItem && item.questionItem.question) {
                 const q = item.questionItem.question;
+                const points = q.grading?.pointValue || 0;
+                const correctAnswers = q.grading?.correctAnswers?.answers?.map(a => a.value) || [];
+                
+                if (correctAnswers.length > 0) {
+                    maxAutoPoints += points;
+                } else if (points > 0) {
+                    // It has points but no correct answers defined -> Essay / Short Answer
+                    maxManualPoints += points;
+                }
+
                 questionMap[q.questionId] = {
                     title: item.title || "Untitled Question",
-                    correctAnswers: q.grading?.correctAnswers?.answers?.map(a => a.value) || []
+                    correctAnswers: correctAnswers,
+                    points: points,
+                    isManual: correctAnswers.length === 0 && points > 0
                 };
             } else if (item.questionGroupItem && item.questionGroupItem.questions) {
                 // Handle grid/matrix questions if any
                 item.questionGroupItem.questions.forEach(q => {
+                    const rowPoints = q.grading?.pointValue || 0;
+                    const rowAnswers = q.grading?.correctAnswers?.answers?.map(a => a.value) || [];
+                    
+                    if (rowAnswers.length > 0) {
+                         maxAutoPoints += rowPoints;
+                    } else if (rowPoints > 0) {
+                         maxManualPoints += rowPoints;
+                    }
+
                     questionMap[q.questionId] = {
                         title: `${item.title || "Group"} - Row`,
-                        correctAnswers: q.grading?.correctAnswers?.answers?.map(a => a.value) || []
+                        correctAnswers: rowAnswers,
+                        points: rowPoints,
+                        isManual: rowAnswers.length === 0 && rowPoints > 0
                     };
                 });
             }
@@ -134,10 +160,12 @@ export async function extractGoogleFormResponse(accessToken, formId, studentEmai
             const qInfo = questionMap[questionId] || { title: "Unknown Question", correctAnswers: [] };
             const answerText = answerObj.textAnswers?.answers?.map(a => a.value).join(", ") || "No Answer / Blank";
 
-            compiledText += `Question: ${qInfo.title}\n`;
+            compiledText += `Question: ${qInfo.title} (Worth: ${qInfo.points} pts)\n`;
             compiledText += `Student Answer: ${answerText}\n`;
 
-            if (qInfo.correctAnswers && qInfo.correctAnswers.length > 0) {
+            if (qInfo.isManual) {
+                compiledText += `[AI INSTRUCTION FOR THIS QUESTION]: This is a manual-grade essay/short-answer question. Evaluate the student's answer based on the teacher's rubric and assign a score up to the maximum ${qInfo.points} points.\n`;
+            } else if (qInfo.correctAnswers && qInfo.correctAnswers.length > 0) {
                 compiledText += `[NATIVE FORM ANSWER KEY]: The correct answer programmed into the Google Form Quiz is: ${qInfo.correctAnswers.join(" OR ")}\n`;
             }
 
@@ -146,24 +174,28 @@ export async function extractGoogleFormResponse(accessToken, formId, studentEmai
         
         // 5. Calculate Native Score if available
         let autoGrade = null;
+        const totalMaxPoints = maxAutoPoints + maxManualPoints;
+
         if (studentFormResponse.totalScore !== undefined) {
-            // Google Forms only gives us the totalScore achievable by summing the points in the questions
-            let maxPoints = 0;
-            form.items?.forEach(item => {
-                const points = item.questionItem?.question?.grading?.pointValue;
-                if (points) maxPoints += points;
-                
-                // Also check grid questions
-                item.questionGroupItem?.questions?.forEach(q => {
-                    const rowPoints = q.grading?.pointValue;
-                    if (rowPoints) maxPoints += rowPoints;
-                });
-            });
+            // studentFormResponse.totalScore represents the points they got from the strictly auto-graded section
+            const earnedAutoPoints = studentFormResponse.totalScore;
             
-            if (maxPoints > 0) {
-                 // Calculate percentage 0-100 to match the rest of the application
-                 autoGrade = Math.round((studentFormResponse.totalScore / maxPoints) * 100).toString();
-                 compiledText = `[NATIVE GRADE: ${studentFormResponse.totalScore} / ${maxPoints} (${autoGrade}%)]\n\n` + compiledText;
+            if (maxManualPoints > 0) {
+                 // The form has essays. We MUST NOT return a nativeGrade so the system sends it to the AI.
+                 // We will append a header instructing the AI on the exact math to perform.
+                 let header = `====================================================\n`;
+                 header += `!!! ATTENTION AI GRADER: MIXED FORMAT GOOGLE FORM !!!\n`;
+                 header += `This Google Form contains both auto-graded multiple-choice questions AND manual-grade essays.\n`;
+                 header += `[POINTS ALREADY EARNED]: The student scored ${earnedAutoPoints} out of ${maxAutoPoints} on the auto-graded questions.\n`;
+                 header += `[PENDING MANUAL POINTS]: There are ${maxManualPoints} points worth of essays below that need your evaluation.\n`;
+                 header += `[FINAL GRADE MATH]: You MUST grade the essays below, give them a score out of ${maxManualPoints}, add that score to the ${earnedAutoPoints} already earned, and return the final percentage out of ${totalMaxPoints}.\n`;
+                 header += `====================================================\n\n`;
+                 
+                 compiledText = header + compiledText;
+            } else if (totalMaxPoints > 0) {
+                 // 100% strictly auto-graded Google Form (No essays). We can return the native percentage directly and skip AI.
+                 autoGrade = Math.round((earnedAutoPoints / totalMaxPoints) * 100).toString();
+                 compiledText = `[NATIVE GRADE: ${earnedAutoPoints} / ${totalMaxPoints} (${autoGrade}%)]\n\n` + compiledText;
             }
         }
 
