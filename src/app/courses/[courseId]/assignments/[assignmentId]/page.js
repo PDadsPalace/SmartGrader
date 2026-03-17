@@ -668,11 +668,14 @@ export default function GradingWorkspace() {
 
         stopGradingRef.current = false;
         let completedCount = 0;
-        const CHUNK_SIZE = 20; // Process 20 students simultaneously
+        const totalToProcess = submissions.length;
 
-        for (let i = 0; i < submissions.length; i += CHUNK_SIZE) {
+        // Gemini Free Tier is 15 Requests Per Minute. 
+        // We will process 2 at a time, then wait 8 seconds. (15 RPM)
+        const concurrency = 2;
+        for (let i = 0; i < submissions.length; i += concurrency) {
             if (stopGradingRef.current) break;
-            const chunk = submissions.slice(i, i + CHUNK_SIZE);
+            const chunk = submissions.slice(i, i + concurrency);
 
             await Promise.all(chunk.map(async (sub) => {
                 if (stopGradingRef.current) return;
@@ -831,7 +834,13 @@ export default function GradingWorkspace() {
                         })
                     });
 
-                    const gradeData = await gradeRes.json();
+                    let gradeData;
+                    try {
+                        gradeData = await gradeRes.json();
+                    } catch (e) {
+                        // If json parsing fails, it's likely a 504 Gateway Timeout from Vercel
+                        throw new Error(`Server returned a timeout or invalid response (Code: ${gradeRes.status}). This usually means the AI hit a rate limit. Just click 'Grade Remaining' to retry.`);
+                    }
 
                     if (gradeRes.ok) {
                         // Extract just the numerical value from the AI response (e.g., "A- (85/100)" -> "85")
@@ -904,6 +913,9 @@ export default function GradingWorkspace() {
                     setBatchProgress({ current: completedCount, total: submissions.length });
                 }
             }));
+            
+            // Wait 8 seconds between batches to avoid hitting the Gemini API 15 RPM limit on free tier
+            await new Promise(resolve => setTimeout(resolve, 8000));
         }
 
         setBatchGrading(false);
