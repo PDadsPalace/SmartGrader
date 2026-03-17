@@ -363,9 +363,10 @@ export default function GradingWorkspace() {
             }
             
             // Phase 10: Auto-Apply Native Grades (Google Forms)
-            // If the document extractor yielded a nativeGrade, force it and skip AI.
-            // (Wait on document content fetcher to store nativeGrade first, we will update fetch block shortly)
-            if (selectedSubmission.nativeGrade !== undefined) {
+            // If the document extractor yielded a valid nativeGrade AND the user didn't provide any rubric/key,
+            // force it and skip AI. If they provided a rubric, they want the AI to grade the open-ended parts.
+            const hasRubricInstructions = rubric.trim() || useStudentAsKey || rubricFile;
+            if (selectedSubmission.nativeGrade != null && !hasRubricInstructions) {
                  let finalNativeGrade = selectedSubmission.nativeGrade;
                  let feedback = "Grade automatically imported from Google Forms native score. No AI analysis was run.";
                  
@@ -780,7 +781,8 @@ export default function GradingWorkspace() {
                         return; // Skip the API call for this student
                     }
                     
-                    if (docData.nativeGrade !== undefined) {
+                    const hasRubricInstructions = rubric.trim() || useStudentAsKey || rubricFile;
+                    if (docData.nativeGrade != null && !hasRubricInstructions) {
                          let finalNativeGrade = docData.nativeGrade;
                          let feedback = "Grade automatically imported from Google Forms native score. No AI analysis was run.";
                          
@@ -984,7 +986,7 @@ export default function GradingWorkspace() {
                     <div className="min-w-0 pr-4">
                         <h2 className="text-[10px] font-black uppercase tracking-widest text-indigo-500 dark:text-indigo-400 mb-0.5">{courseName || "Loading Course..."}</h2>
                         <h1 className="text-lg font-bold text-slate-900 dark:text-slate-50 leading-tight truncate">
-                            {assignmentName || "Grading Workspace"} <span className="text-xs text-indigo-500 ml-2 bg-indigo-50 px-2 py-1 rounded">v3.4</span>
+                            {assignmentName || "Grading Workspace"} <span className="text-xs text-indigo-500 ml-2 bg-indigo-50 px-2 py-1 rounded">v3.5</span>
                         </h1>
                     </div>
                 </div>
