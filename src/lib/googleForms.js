@@ -104,17 +104,20 @@ export async function extractGoogleFormResponse(accessToken, formId, studentEmai
             allResponses.forEach(r => {
                 let score = 0;
                 const answersObj = r.answers || {};
-                const textAnswers = Object.values(answersObj)
-                    .flatMap(a => a.textAnswers?.answers?.map(ans => ans.value.toLowerCase().trim()) || []);
                 
-                // Convert all answers to a concatenated squished string for absolute matching
+                // ONLY look at short answers (like Name fields) to prevent scanning entire long essays for matches
+                const textAnswers = Object.values(answersObj)
+                    .flatMap(a => a.textAnswers?.answers?.map(ans => ans.value.toLowerCase().trim()) || [])
+                    .filter(text => text.length < 60); 
+                
+                // Convert all short answers to a concatenated squished string for absolute matching
                 const fullTextSquished = textAnswers.join("").replace(/[^a-z0-9]/g, '');
                 
                 // Method A: Perfect squished match forwards or backwards
-                if (targetNameClean.length > 3 && fullTextSquished.includes(targetNameClean)) {
+                if (targetNameClean.length > 5 && fullTextSquished.includes(targetNameClean)) {
                     score += 100;
                 }
-                if (reverseNameClean && reverseNameClean.length > 3 && fullTextSquished.includes(reverseNameClean)) {
+                if (reverseNameClean && reverseNameClean.length > 5 && fullTextSquished.includes(reverseNameClean)) {
                     score += 100;
                 }
                 
@@ -122,10 +125,7 @@ export async function extractGoogleFormResponse(accessToken, formId, studentEmai
                 const typedWords = textAnswers.flatMap(text => text.split(/[\s,.-]+/)).filter(w => w.length >= 3);
                 for (const part of targetParts) {
                     if (typedWords.includes(part)) {
-                        score += 50; // They typed "Logan" distinctly
-                    } else if (typedWords.some(tw => tw.includes(part) || (part.length >= 5 && part.includes(tw)))) {
-                        // Very strict partial match: 'tw' includes 'logan' OR 'logan' includes 'logann'
-                        score += 10;
+                        score += 50; // Exact match of First or Last name
                     }
                 }
                 
@@ -135,8 +135,8 @@ export async function extractGoogleFormResponse(accessToken, formId, studentEmai
                 }
             });
             
-            // Require a threshold indicating at least one distinct naming match
-            if (highestScore >= 10) {
+            // Require a threshold indicating a solid exact match
+            if (highestScore >= 50) {
                 studentFormResponse = bestMatchResponse;
             }
         }
