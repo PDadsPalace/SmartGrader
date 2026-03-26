@@ -56,10 +56,10 @@ If the submission begins with "!!! ATTENTION AI GRADER: MIXED FORMAT GOOGLE FORM
 5. Finally, ADD your essay score to the points they ALREADY EARNED. Divide that sum by the total possible points to get the final percentage out of 100. RETURN THAT FINAL PERCENTAGE. DO NOT return just the essay score!
 
 **YOUR TASK:**
-Evaluate the submission. You must return your evaluation strictly in the following JSON format:
-{
-  "suggested_grade": "A number between 0 and 100 representing the score. YOU MUST return ONLY the raw integer (e.g., 85). DO NOT add '/100', DO NOT use a percent sign (%), DO NOT return a letter grade.",
-  "feedback_text": "A paragraph of constructive feedback written directly to the student. If this was a mixed-format form, explain how many points they got on the essays vs the auto-graded section so they understand their final grade."
+Evaluate the submission. You must return your evaluation strictly in JSON format.
+${generateFeedback 
+    ? `- Include a "suggested_grade" key with the raw score.\n- Include a "feedback_text" key with a paragraph of constructive feedback directly to the student.`
+    : `- Only return a "suggested_grade" key. Do NOT generate feedback text to maximize speed.`
 }
 `;
 
@@ -99,13 +99,32 @@ CRITICAL REMINDER: Look closely at the student's file and text. If both are comp
             });
         }
 
+        const responseSchema = {
+            type: "object",
+            properties: {
+                suggested_grade: {
+                    type: "string",
+                    description: "A number between 0 and 100 representing the score. YOU MUST return ONLY the raw integer (e.g., 85)."
+                },
+                ...(generateFeedback ? {
+                    feedback_text: {
+                        type: "string",
+                        description: "Constructive feedback for the student."
+                    }
+                } : {})
+            },
+            required: ["suggested_grade"]
+        };
+
         // Call Gemini 2.5 Flash
         const response = await ai.models.generateContent({
             model: 'gemini-2.5-flash',
             contents: contentsData,
             config: {
                 systemInstruction: systemInstruction,
-                responseMimeType: "application/json"
+                responseMimeType: "application/json",
+                responseSchema: responseSchema,
+                temperature: 0.1
             }
         });
 

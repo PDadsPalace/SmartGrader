@@ -675,15 +675,13 @@ export default function GradingWorkspace() {
         let completedCount = 0;
         const totalToProcess = submissions.length;
 
-        // Graduated from Free Tier. Upgraded processing speed. 
-        // We will process 6 at a time, then wait 2 seconds.
-        const concurrency = 6;
-        for (let i = 0; i < submissions.length; i += concurrency) {
-            if (stopGradingRef.current) break;
-            const chunk = submissions.slice(i, i + concurrency);
+        // Sliding Window Concurrency Pool
+        // We will process up to 6 students simultaneously, starting a new one the exact moment one finishes.
+        const MAX_CONCURRENT = 6;
+        let currentIndex = 0;
 
-            await Promise.all(chunk.map(async (sub) => {
-                if (stopGradingRef.current) return;
+        const processSubmission = async (sub) => {
+            if (stopGradingRef.current) return;
 
                 try {
                     // Skip if already graded in this session (unless forced)
@@ -763,20 +761,21 @@ export default function GradingWorkspace() {
                         let mockGrade = "50";
                         let mockFeedback = "Missing assignment. No file or text was submitted.";
 
+                        const sFloor = localStorage.getItem(`student_floor_${sub.userId}`);
+                        
                         if (bypassMissingWork) {
                             mockGrade = missingWorkGrade || "0";
                         } else {
-                            mockGrade = /\b0\b/.test(sNotes) || /\bzero\b/i.test(sNotes) ? "0" : "50"; // Changed default empty document grade back to 50
+                            // Automatically give missing work an actual 0 if the teacher explicitly set their floor to exactly 0 for this student
+                            const isFloorZero = sFloor && sFloor.trim() === "0";
+                            mockGrade = (isFloorZero || /\b0\b/.test(sNotes) || /\bzero\b/i.test(sNotes)) ? "0" : "50"; 
                         }
 
-                        if (!bypassMissingWork) {
-                            const sFloor = localStorage.getItem(`student_floor_${sub.userId}`);
-                            if (sFloor) {
-                                const floorVal = parseFloat(sFloor);
-                                const returnedVal = parseFloat(mockGrade);
-                                if (!isNaN(floorVal) && !isNaN(returnedVal) && returnedVal < floorVal) {
-                                    mockGrade = floorVal.toString();
-                                }
+                        if (!bypassMissingWork && sFloor) {
+                            const floorVal = parseFloat(sFloor);
+                            const returnedVal = parseFloat(mockGrade);
+                            if (!isNaN(floorVal) && !isNaN(returnedVal) && returnedVal < floorVal) {
+                                mockGrade = floorVal.toString();
                             }
                         }
 
@@ -823,28 +822,42 @@ export default function GradingWorkspace() {
                          return; // Skip AI call
                     }
 
-                    // 2. Grade
-                    const gradeRes = await fetch('/api/grade', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            rubric: baselineRubric,
-                            strictness: strictness,
-                            submissionText: submissionTextForAI,
-                            studentId: sub.userId,
-                            studentNotes: sNotes,
-                            studentFile: inlineDataForAI,
-                            rubricFile: baselineRubricFile,
-                            generateFeedback: generateFeedback
-                        })
-                    });
+                    // 2. Grade (with Exponential Backoff Retry)
+                    const fetchGradeWithRetry = async (retryCount = 0) => {
+                        const res = await fetch('/api/grade', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                rubric: baselineRubric,
+                                strictness: strictness,
+                                submissionText: submissionTextForAI,
+                                studentId: sub.userId,
+                                studentNotes: sNotes,
+                                studentFile: inlineDataForAI,
+                                rubricFile: baselineRubricFile,
+                                generateFeedback: generateFeedback
+                            })
+                        });
+                        
+                        if (!res.ok && (res.status === 429 || res.status === 504 || res.status >= 500)) {
+                            if (retryCount < 3) {
+                                const waitTime = Math.pow(2, retryCount + 1) * 1000; // 2s, 4s, 8s
+                                console.warn(`API returned ${res.status} for ${sub.userId}. Retrying in ${waitTime}ms... (${retryCount + 1}/3)`);
+                                await new Promise(resolve => setTimeout(resolve, waitTime));
+                                return fetchGradeWithRetry(retryCount + 1);
+                            }
+                        }
+                        return res;
+                    };
+
+                    const gradeRes = await fetchGradeWithRetry();
 
                     let gradeData;
                     try {
                         gradeData = await gradeRes.json();
                     } catch (e) {
                         // If json parsing fails, it's likely a 504 Gateway Timeout from Vercel
-                        throw new Error(`Server returned a timeout or invalid response (Code: ${gradeRes.status}). This usually means the AI hit a rate limit. Just click 'Grade Remaining' to retry.`);
+                        throw new Error(`Server returned a timeout or invalid response (Code: ${gradeRes.status}). The AI might have hit a rate limit too many times.`);
                     }
 
                     if (gradeRes.ok) {
@@ -915,13 +928,18 @@ export default function GradingWorkspace() {
                     setBatchResults(prev => ({ ...prev, [sub.id]: failObj }));
                 } finally {
                     completedCount++;
-                    setBatchProgress({ current: completedCount, total: submissions.length });
+                    setBatchProgress({ current: completedCount, total: totalToProcess });
                 }
-            }));
-            
-            // Wait 2 seconds between batches based on new limits
-            await new Promise(resolve => setTimeout(resolve, 2000));
-        }
+        };
+
+        const workers = Array(MAX_CONCURRENT).fill(null).map(async () => {
+            while (currentIndex < submissions.length && !stopGradingRef.current) {
+                const sub = submissions[currentIndex++];
+                await processSubmission(sub);
+            }
+        });
+
+        await Promise.all(workers);
 
         setBatchGrading(false);
     };
@@ -1003,7 +1021,7 @@ export default function GradingWorkspace() {
                     <div className="min-w-0 pr-4">
                         <h2 className="text-[10px] font-black uppercase tracking-widest text-indigo-500 dark:text-indigo-400 mb-0.5">{courseName || "Loading Course..."}</h2>
                         <h1 className="text-lg font-bold text-slate-900 dark:text-slate-50 leading-tight truncate">
-                            {assignmentName || "Grading Workspace"} <span className="text-xs text-indigo-500 ml-2 bg-indigo-50 px-2 py-1 rounded">v3.6</span>
+                            {assignmentName || "Grading Workspace"} <span className="text-xs text-indigo-500 ml-2 bg-indigo-50 px-2 py-1 rounded">v3.8</span>
                         </h1>
                     </div>
                 </div>
@@ -1100,7 +1118,7 @@ export default function GradingWorkspace() {
                                         const savedFloor = localStorage.getItem(`student_floor_${sub.userId}`);
                                         setStudentGradeFloor(savedFloor || "");
                                     }}
-                                    className={`relative p-4 rounded-xl cursor-pointer border transition-all ${selectedSubmission?.id === sub.id ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-900/40 shadow-sm' : 'border-slate-100 dark:border-slate-800 hover:border-slate-300 dark:border-slate-700 hover:bg-slate-50'}`}
+                                    className={`relative p-4 rounded-xl cursor-pointer border transition-all ${selectedSubmission?.id === sub.id ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-900 shadow-sm' : 'border-slate-100 dark:border-slate-800 hover:border-slate-300 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800'}`}
                                 >
                                     {batchResults[sub.id] && (
                                         <div className="absolute top-0 right-0 -mt-2 -mr-2 z-10 flex items-center gap-1 bg-white dark:bg-slate-900 rounded-full shadow-sm border border-slate-200 dark:border-slate-700 p-0.5" onClick={(e) => e.stopPropagation()}>
