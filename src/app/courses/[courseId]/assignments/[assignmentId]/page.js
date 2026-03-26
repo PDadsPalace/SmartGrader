@@ -651,8 +651,13 @@ export default function GradingWorkspace() {
                     const keyRes = await fetch(`/api/courses/${courseId}/assignments/${assignmentId}/submissions/${keySub.id}`);
                     const docData = await keyRes.json();
                     let keyText = "";
-                    if (docData.data) keyText = docData.data;
-                    else if (docData.content) keyText = docData.content;
+                    if (docData.isBinary) {
+                        keyText = "See attached master student file.";
+                    } else if (docData.data) {
+                        keyText = docData.data;
+                    } else if (docData.content) {
+                        keyText = docData.content;
+                    }
                     if (keyText) {
                         baselineRubric = `Use the following student submission as the perfect 100% Answer Key. Every other student must be graded strictly against how well their answers match this master student's answers.\n\nAdditional Instructions from Teacher:\n${rubric}\n\n[MASTER STUDENT TEXT]:\n\n` + keyText;
                         baselineRubricFile = null;
@@ -670,9 +675,9 @@ export default function GradingWorkspace() {
         let completedCount = 0;
         const totalToProcess = submissions.length;
 
-        // Gemini Free Tier is 15 Requests Per Minute. 
-        // We will process 2 at a time, then wait 8 seconds. (15 RPM)
-        const concurrency = 2;
+        // Graduated from Free Tier. Upgraded processing speed. 
+        // We will process 6 at a time, then wait 2 seconds.
+        const concurrency = 6;
         for (let i = 0; i < submissions.length; i += concurrency) {
             if (stopGradingRef.current) break;
             const chunk = submissions.slice(i, i + concurrency);
@@ -914,8 +919,8 @@ export default function GradingWorkspace() {
                 }
             }));
             
-            // Wait 8 seconds between batches to avoid hitting the Gemini API 15 RPM limit on free tier
-            await new Promise(resolve => setTimeout(resolve, 8000));
+            // Wait 2 seconds between batches based on new limits
+            await new Promise(resolve => setTimeout(resolve, 2000));
         }
 
         setBatchGrading(false);
@@ -998,7 +1003,7 @@ export default function GradingWorkspace() {
                     <div className="min-w-0 pr-4">
                         <h2 className="text-[10px] font-black uppercase tracking-widest text-indigo-500 dark:text-indigo-400 mb-0.5">{courseName || "Loading Course..."}</h2>
                         <h1 className="text-lg font-bold text-slate-900 dark:text-slate-50 leading-tight truncate">
-                            {assignmentName || "Grading Workspace"} <span className="text-xs text-indigo-500 ml-2 bg-indigo-50 px-2 py-1 rounded">v3.5</span>
+                            {assignmentName || "Grading Workspace"} <span className="text-xs text-indigo-500 ml-2 bg-indigo-50 px-2 py-1 rounded">v3.6</span>
                         </h1>
                     </div>
                 </div>
