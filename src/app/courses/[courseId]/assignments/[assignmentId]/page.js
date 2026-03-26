@@ -843,6 +843,13 @@ export default function GradingWorkspace() {
                             if (retryCount < 3) {
                                 const waitTime = Math.pow(2, retryCount + 1) * 1000; // 2s, 4s, 8s
                                 console.warn(`API returned ${res.status} for ${sub.userId}. Retrying in ${waitTime}ms... (${retryCount + 1}/3)`);
+                                
+                                // Update UI so it doesn't look hung!
+                                setBatchResults(prev => ({ 
+                                    ...prev, 
+                                    [sub.id]: { grade: "Retrying", feedback: `API Timeout or Rate Limit (${res.status}). Waiting ${waitTime/1000}s and trying again (${retryCount + 1}/3)...` } 
+                                }));
+                                
                                 await new Promise(resolve => setTimeout(resolve, waitTime));
                                 return fetchGradeWithRetry(retryCount + 1);
                             }
@@ -862,7 +869,8 @@ export default function GradingWorkspace() {
 
                     if (gradeRes.ok) {
                         // Extract just the numerical value from the AI response (e.g., "A- (85/100)" -> "85")
-                        let rawGrade = String(gradeData.grade || "N/A");
+                        // Use ?? instead of || so that an actual integer 0 doesn't get coerced to "N/A"
+                        let rawGrade = String(gradeData.grade ?? "N/A");
                         let finalGradeCalculated = rawGrade;
                         
                         // First look for something formatted like "85%"
@@ -1021,7 +1029,7 @@ export default function GradingWorkspace() {
                     <div className="min-w-0 pr-4">
                         <h2 className="text-[10px] font-black uppercase tracking-widest text-indigo-500 dark:text-indigo-400 mb-0.5">{courseName || "Loading Course..."}</h2>
                         <h1 className="text-lg font-bold text-slate-900 dark:text-slate-50 leading-tight truncate">
-                            {assignmentName || "Grading Workspace"} <span className="text-xs text-indigo-500 ml-2 bg-indigo-50 px-2 py-1 rounded">v3.8</span>
+                            {assignmentName || "Grading Workspace"} <span className="text-xs text-indigo-500 ml-2 bg-indigo-50 px-2 py-1 rounded">v3.81</span>
                         </h1>
                     </div>
                 </div>
