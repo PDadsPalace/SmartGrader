@@ -3,7 +3,7 @@
 import { useSession } from "next-auth/react";
 import { useEffect, useState, useRef } from "react";
 import { usePathname, useRouter } from "next/navigation";
-import { ArrowLeft, User, FileText, Settings2, Sparkles, CheckCircle2, ListChecks, Download, RefreshCw, X, AlertTriangle, UploadCloud } from "lucide-react";
+import { ArrowLeft, User, FileText, Settings2, Sparkles, CheckCircle2, ListChecks, Download, RefreshCw, X, AlertTriangle, UploadCloud, Zap } from "lucide-react";
 import Papa from "papaparse";
 import stringSimilarity from "string-similarity";
 
@@ -67,6 +67,11 @@ export default function GradingWorkspace() {
     const [missingWorkGrade, setMissingWorkGrade] = useState("0");
     const [applyLatePenalty, setApplyLatePenalty] = useState(false);
     const [latePenalty, setLatePenalty] = useState("10");
+
+    // EdPuzzle / External Grade Mode
+    const [isEdpuzzleMode, setIsEdpuzzleMode] = useState(false);
+    const [importingGrades, setImportingGrades] = useState(false);
+    const [importedCount, setImportedCount] = useState(0);
 
     useEffect(() => {
         if (status === "unauthenticated") {
@@ -206,6 +211,27 @@ export default function GradingWorkspace() {
         }
     };
 
+    // Helper to detect EdPuzzle assignments
+    const detectEdpuzzle = (details, subs) => {
+        if (!details) return false;
+        // 1. Title contains "edpuzzle"
+        if (details.title?.toLowerCase().includes("edpuzzle")) return true;
+        // 2. Any material has an edpuzzle.com link
+        if (details.materials) {
+            for (const mat of details.materials) {
+                if (mat.link?.url?.includes("edpuzzle.com")) return true;
+                if (mat.driveFile?.driveFile?.alternateLink?.includes("edpuzzle.com")) return true;
+            }
+        }
+        // 3. On the grading page: most submissions have assignedGrade but no drive attachments
+        if (subs && subs.length > 0) {
+            const withGrade = subs.filter(s => s.assignedGrade != null).length;
+            const withAttachments = subs.filter(s => s.assignmentSubmission?.attachments?.length > 0).length;
+            if (withGrade >= Math.ceil(subs.length / 2) && withAttachments === 0) return true;
+        }
+        return false;
+    };
+
     useEffect(() => {
         if (session?.accessToken && courseId && assignmentId) {
             setLoading(true);
@@ -213,16 +239,25 @@ export default function GradingWorkspace() {
                 .then((res) => res.json())
                 .then((data) => {
                     if (data.error) throw new Error(data.error);
-                    setSubmissions(data.submissions || []);
+                    const subs = data.submissions || [];
+                    setSubmissions(subs);
                     if (data.assignmentDetails) {
                         setAssignmentName(data.assignmentDetails.title || "");
                         setAssignmentInfo(data.assignmentDetails);
                         if (data.assignmentDetails.courseName) {
                             setCourseName(data.assignmentDetails.courseName);
                         }
+                        // Auto-detect or restore EdPuzzle mode
+                        const savedFlag = localStorage.getItem(`edpuzzle_${courseId}_${assignmentId}`);
+                        if (savedFlag === "true" || savedFlag === "false") {
+                            setIsEdpuzzleMode(savedFlag === "true");
+                        } else if (detectEdpuzzle(data.assignmentDetails, subs)) {
+                            setIsEdpuzzleMode(true);
+                            localStorage.setItem(`edpuzzle_${courseId}_${assignmentId}`, "true");
+                        }
                     }
-                    if (data.submissions?.length > 0) {
-                        const firstSub = data.submissions[0];
+                    if (subs.length > 0) {
+                        const firstSub = subs[0];
                         setSelectedSubmission(firstSub);
                         // Load saved student notes & floor
                         const savedNotes = localStorage.getItem(`student_notes_${firstSub.userId}`);
@@ -614,6 +649,36 @@ export default function GradingWorkspace() {
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
+    };
+
+    // EdPuzzle: Import grades directly from Classroom's assignedGrade field
+    const handleImportClassroomGrades = () => {
+        if (submissions.length === 0) return;
+        setImportingGrades(true);
+        const results = {};
+        let count = 0;
+        submissions.forEach(sub => {
+            if (sub.assignedGrade != null && sub.assignedGrade !== undefined) {
+                results[sub.id] = {
+                    grade: String(sub.assignedGrade),
+                    feedback: "Grade imported from Google Classroom (EdPuzzle or external tool). No AI grading was run."
+                };
+                count++;
+            } else {
+                results[sub.id] = {
+                    grade: "0",
+                    feedback: "No grade found in Google Classroom. Student likely did not complete the EdPuzzle activity."
+                };
+            }
+        });
+        setBatchResults(prev => ({ ...prev, ...results }));
+        localStorage.setItem(`grades_${courseId}_${assignmentId}`, JSON.stringify({ ...batchResults, ...results }));
+        setImportedCount(count);
+        // Show the first student's result immediately
+        if (selectedSubmission && results[selectedSubmission.id]) {
+            setAiFeedback(results[selectedSubmission.id]);
+        }
+        setImportingGrades(false);
     };
 
     const handleRegradeAll = async () => {
@@ -1029,15 +1094,22 @@ export default function GradingWorkspace() {
                     <div className="min-w-0 pr-4">
                         <h2 className="text-[10px] font-black uppercase tracking-widest text-indigo-500 dark:text-indigo-400 mb-0.5">{courseName || "Loading Course..."}</h2>
                         <h1 className="text-lg font-bold text-slate-900 dark:text-slate-50 leading-tight truncate">
-                            {assignmentName || "Grading Workspace"} <span className="text-xs text-indigo-500 ml-2 bg-indigo-50 px-2 py-1 rounded">v3.81</span>
+                            {assignmentName || "Grading Workspace"} <span className="text-xs text-indigo-500 ml-2 bg-indigo-50 px-2 py-1 rounded">v3.82</span>
                         </h1>
                     </div>
                 </div>
                 <div className="flex items-center gap-3">
-                    <div className="bg-indigo-50 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-400 px-3 py-1 rounded-full text-sm font-semibold flex items-center gap-1.5">
-                        <Sparkles className="w-4 h-4" />
-                        Gemini AI Ready
-                    </div>
+                    {isEdpuzzleMode ? (
+                        <div className="bg-violet-100 dark:bg-violet-900/40 text-violet-700 dark:text-violet-400 px-3 py-1 rounded-full text-sm font-semibold flex items-center gap-1.5">
+                            <Zap className="w-4 h-4" />
+                            EdPuzzle / External Mode
+                        </div>
+                    ) : (
+                        <div className="bg-indigo-50 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-400 px-3 py-1 rounded-full text-sm font-semibold flex items-center gap-1.5">
+                            <Sparkles className="w-4 h-4" />
+                            Gemini AI Ready
+                        </div>
+                    )}
                 </div>
             </header>
 
@@ -1292,14 +1364,61 @@ export default function GradingWorkspace() {
                                 </div>
                             )}
 
+                            {/* EdPuzzle Import Banner */}
+                            {isEdpuzzleMode && (
+                                <div className="bg-violet-50 dark:bg-violet-900/30 border border-violet-200 dark:border-violet-800 rounded-2xl p-5 flex flex-col gap-4 animate-in slide-in-from-top-2 duration-300">
+                                    <div className="flex items-start gap-3">
+                                        <Zap className="w-5 h-5 text-violet-600 dark:text-violet-400 flex-shrink-0 mt-0.5" />
+                                        <div>
+                                            <p className="font-bold text-violet-900 dark:text-violet-200 text-sm">EdPuzzle / Externally Graded Assignment</p>
+                                            <p className="text-xs text-violet-700 dark:text-violet-400 mt-0.5">Grades are already in Google Classroom (posted by EdPuzzle or another tool). Click the button below to pull them all in — students who haven't completed it will receive a 0.</p>
+                                        </div>
+                                    </div>
+                                    {importedCount > 0 && (
+                                        <div className="text-xs font-bold text-violet-700 dark:text-violet-400 bg-violet-100 dark:bg-violet-900/40 px-3 py-1.5 rounded-lg border border-violet-200 dark:border-violet-700 flex items-center gap-1.5">
+                                            <CheckCircle2 className="w-3.5 h-3.5" /> {importedCount} grade{importedCount !== 1 ? 's' : ''} imported from Classroom
+                                        </div>
+                                    )}
+                                    <button
+                                        onClick={handleImportClassroomGrades}
+                                        disabled={importingGrades || submissions.length === 0}
+                                        className="w-full flex items-center justify-center gap-2 bg-violet-600 hover:bg-violet-700 text-white py-3 px-4 rounded-xl font-bold transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-sm active:scale-[0.99]"
+                                    >
+                                        {importingGrades ? (
+                                            <><div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white" /> Importing...</>
+                                        ) : (
+                                            <><Download className="w-5 h-5" /> Import All Grades from Classroom</>
+                                        )}
+                                    </button>
+                                </div>
+                            )}
+
                             {/* AI Grading Controls */}
                             <div className="bg-white dark:bg-slate-950 p-6 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-800 space-y-6">
-                                <h3 className="text-lg font-bold border-b border-slate-100 dark:border-slate-800 pb-3 flex items-center gap-2 text-slate-900 dark:text-slate-50">
-                                    <Settings2 className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
-                                    AI Grading Controls
-                                </h3>
+                                <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
+                                    <h3 className="text-lg font-bold flex items-center gap-2 text-slate-900 dark:text-slate-50">
+                                        <Settings2 className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
+                                        AI Grading Controls
+                                    </h3>
+                                    <button
+                                        onClick={() => {
+                                            const next = !isEdpuzzleMode;
+                                            setIsEdpuzzleMode(next);
+                                            localStorage.setItem(`edpuzzle_${courseId}_${assignmentId}`, String(next));
+                                        }}
+                                        className={`flex items-center gap-2 text-xs font-bold px-3 py-2 rounded-lg border transition-all ${
+                                            isEdpuzzleMode
+                                                ? 'bg-violet-600 border-violet-600 text-white shadow-md shadow-violet-200 dark:shadow-violet-900/40'
+                                                : 'bg-slate-100 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400 hover:bg-violet-50 hover:border-violet-300 hover:text-violet-700'
+                                        }`}
+                                        title={isEdpuzzleMode ? 'Click to switch back to AI grading mode' : 'Click to enable EdPuzzle / External Grade import mode'}
+                                    >
+                                        <Zap className="w-3.5 h-3.5" />
+                                        {isEdpuzzleMode ? 'EdPuzzle Mode: ON' : 'EdPuzzle Mode'}
+                                    </button>
+                                </div>
 
-                                <div className="space-y-4">
+                                <div className={`space-y-4 ${isEdpuzzleMode ? 'opacity-40 pointer-events-none select-none' : ''}`}>
                                     <div>
                                         <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">Grading Strictness</label>
                                         <div className="flex items-center gap-4">

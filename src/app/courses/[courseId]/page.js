@@ -3,7 +3,7 @@
 import { useSession } from "next-auth/react";
 import { useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
-import { BookOpen, GraduationCap, ArrowLeft, Calendar, FileText, CheckCircle2, Plus, X, Link as LinkIcon, Youtube, File as FileIcon, RefreshCw } from "lucide-react";
+import { BookOpen, GraduationCap, ArrowLeft, Calendar, FileText, CheckCircle2, Plus, X, Link as LinkIcon, Youtube, File as FileIcon, RefreshCw, Zap } from "lucide-react";
 import useDrivePicker from "react-google-drive-picker";
 
 export default function CourseAssignments() {
@@ -18,6 +18,7 @@ export default function CourseAssignments() {
     const [gradedStatus, setGradedStatus] = useState({});
     const [averageGrades, setAverageGrades] = useState({});
     const [filterMode, setFilterMode] = useState("All");
+    const [edpuzzleFlags, setEdpuzzleFlags] = useState({}); // { [assignmentId]: true/false }
 
     const filteredAssignments = assignments.filter(assignment => {
         const isGraded = gradedStatus[assignment.id];
@@ -261,7 +262,31 @@ export default function CourseAssignments() {
         if (assignments.length > 0 && courseId) {
             const statuses = {};
             const averages = {};
+            const epFlags = {};
+
             assignments.forEach(a => {
+                // Auto-detect EdPuzzle from assignment data
+                const isEdpuzzle = (() => {
+                    if (a.title?.toLowerCase().includes("edpuzzle")) return true;
+                    if (a.materials) {
+                        for (const mat of a.materials) {
+                            if (mat.link?.url?.includes("edpuzzle.com")) return true;
+                        }
+                    }
+                    return false;
+                })();
+
+                // Check saved flag (manual override or auto-saved)
+                const savedFlag = localStorage.getItem(`edpuzzle_${courseId}_${a.id}`);
+                if (savedFlag === "true") {
+                    epFlags[a.id] = true;
+                } else if (savedFlag === "false") {
+                    epFlags[a.id] = false;
+                } else if (isEdpuzzle) {
+                    epFlags[a.id] = true;
+                    localStorage.setItem(`edpuzzle_${courseId}_${a.id}`, "true");
+                }
+
                 // Check if manually marked as graded
                 if (localStorage.getItem(`manual_graded_${courseId}_${a.id}`) === "true") {
                     statuses[a.id] = true;
@@ -285,6 +310,7 @@ export default function CourseAssignments() {
             });
             setGradedStatus(statuses);
             setAverageGrades(averages);
+            setEdpuzzleFlags(epFlags);
         }
     }, [assignments, courseId]);
 
@@ -460,6 +486,11 @@ export default function CourseAssignments() {
                                                     <span className="bg-indigo-50 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-400 px-3 py-1 rounded-full text-xs font-bold tracking-wide uppercase">
                                                         {assignment.workType || "Assignment"}
                                                     </span>
+                                                    {edpuzzleFlags[assignment.id] && (
+                                                        <span className="flex items-center gap-1 text-[10px] font-bold text-violet-700 dark:text-violet-400 bg-violet-100 dark:bg-violet-900/60 px-2 py-0.5 rounded-full border border-violet-200 dark:border-violet-800 uppercase tracking-wider">
+                                                            <Zap className="w-3 h-3" /> EdPuzzle
+                                                        </span>
+                                                    )}
                                                     {gradedStatus[assignment.id] && (
                                                         <span className="flex items-center gap-1 text-[10px] font-bold text-emerald-700 dark:text-emerald-400 bg-emerald-100 dark:bg-emerald-900/60 px-2 py-0.5 rounded-full border border-emerald-200 dark:border-emerald-800 uppercase tracking-wider">
                                                             <CheckCircle2 className="w-3 h-3" /> Graded
@@ -500,6 +531,23 @@ export default function CourseAssignments() {
                                                     </span>
                                                 </div>
                                                 <div className="flex items-center gap-2">
+                                                    {/* EdPuzzle toggle button */}
+                                                    <button
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            const next = !edpuzzleFlags[assignment.id];
+                                                            setEdpuzzleFlags(prev => ({ ...prev, [assignment.id]: next }));
+                                                            localStorage.setItem(`edpuzzle_${courseId}_${assignment.id}`, String(next));
+                                                        }}
+                                                        title={edpuzzleFlags[assignment.id] ? 'Turn off EdPuzzle mode' : 'Mark as EdPuzzle / Externally Graded'}
+                                                        className={`p-2 rounded-lg transition-colors flex items-center gap-1 text-xs font-bold ${
+                                                            edpuzzleFlags[assignment.id]
+                                                                ? 'text-violet-600 dark:text-violet-400 bg-violet-100 dark:bg-violet-900/40 hover:bg-violet-200'
+                                                                : 'text-slate-400 hover:text-violet-600 hover:bg-violet-50 dark:hover:bg-violet-900/30'
+                                                        }`}
+                                                    >
+                                                        <Zap className="w-4 h-4" />
+                                                    </button>
                                                     {!gradedStatus[assignment.id] && (
                                                         <button
                                                             onClick={(e) => {
@@ -528,9 +576,20 @@ export default function CourseAssignments() {
                                                     )}
                                                     <button
                                                         onClick={() => router.push(`/courses/${courseId}/assignments/${assignment.id}`)}
-                                                        className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors cursor-pointer flex items-center gap-2 active:scale-95 ${gradedStatus[assignment.id] ? "bg-emerald-100 dark:bg-emerald-900/60 text-emerald-800 dark:text-emerald-400 hover:bg-emerald-200 font-bold" : "bg-slate-900 hover:bg-slate-800 text-white"}`}
+                                                        className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors cursor-pointer flex items-center gap-2 active:scale-95 ${
+                                                            edpuzzleFlags[assignment.id]
+                                                                ? 'bg-violet-600 hover:bg-violet-700 text-white font-bold'
+                                                                : gradedStatus[assignment.id]
+                                                                    ? 'bg-emerald-100 dark:bg-emerald-900/60 text-emerald-800 dark:text-emerald-400 hover:bg-emerald-200 font-bold'
+                                                                    : 'bg-slate-900 hover:bg-slate-800 text-white'
+                                                        }`}
                                                     >
-                                                        {gradedStatus[assignment.id] ? "Review Grades" : "Grade with AI"}
+                                                        {edpuzzleFlags[assignment.id]
+                                                            ? <><Zap className="w-4 h-4" /> Import Grades</>
+                                                            : gradedStatus[assignment.id]
+                                                                ? 'Review Grades'
+                                                                : 'Grade with AI'
+                                                        }
                                                     </button>
                                                 </div>
                                             </div>
