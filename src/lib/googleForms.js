@@ -186,9 +186,9 @@ export async function extractGoogleFormResponse(accessToken, formId, studentEmai
                  let header = `====================================================\n`;
                  header += `!!! ATTENTION AI GRADER: MIXED FORMAT GOOGLE FORM !!!\n`;
                  header += `This Google Form contains both auto-graded multiple-choice questions AND manual-grade essays.\n`;
-                 header += `[POINTS ALREADY EARNED]: The student scored ${earnedAutoPoints} out of ${maxAutoPoints} on the auto-graded questions.\n`;
-                 header += `[PENDING MANUAL POINTS]: There are ${maxManualPoints} points worth of essays below that need your evaluation.\n`;
-                 header += `[FINAL GRADE MATH]: You MUST grade the essays below, give them a score out of ${maxManualPoints}, add that score to the ${earnedAutoPoints} already earned, and return the final percentage out of ${totalMaxPoints}.\n`;
+                 header += `[AUTO-GRADED SCORE]: The student already earned ${earnedAutoPoints} out of ${maxAutoPoints} points on multiple-choice. YOU DO NOT RE-GRADE THESE.\n`;
+                 header += `[YOUR TASK]: Grade ONLY the essay questions marked [AI INSTRUCTION FOR THIS QUESTION] below.\n`;
+                 header += `[WHAT TO RETURN]: Return ONLY the raw essay point total (a single number from 0 to ${maxManualPoints}). Do NOT add the auto-graded points. Do NOT calculate a percentage. The system does the final math automatically.\n`;
                  header += `====================================================\n\n`;
                  
                  compiledText = header + compiledText;
@@ -203,7 +203,10 @@ export async function extractGoogleFormResponse(accessToken, formId, studentEmai
             isBinary: false,
             mimeType: 'text/plain',
             content: compiledText,
-            nativeGrade: autoGrade // Pass this back so page.js can skip AI processing if desired
+            nativeGrade: autoGrade, // Pass this back so page.js can skip AI processing if desired
+            mixedFormMeta: maxManualPoints > 0 // Only set if this is actually a mixed form that needs AI essay grading
+                ? { earnedAutoPoints, maxManualPoints, totalMaxPoints }
+                : null
         };
 
     } catch (error) {

@@ -73,6 +73,9 @@ export default function GradingWorkspace() {
     const [importingGrades, setImportingGrades] = useState(false);
     const [importedCount, setImportedCount] = useState(0);
 
+    // Mixed-format Google Form metadata (populated when a MIXED form is loaded)
+    const [mixedFormMeta, setMixedFormMeta] = useState(null);
+
     useEffect(() => {
         if (status === "unauthenticated") {
             router.push("/");
@@ -302,6 +305,7 @@ export default function GradingWorkspace() {
                         if (data.nativeGrade) {
                             setSelectedSubmission(prev => ({ ...prev, nativeGrade: data.nativeGrade }));
                         }
+                        setMixedFormMeta(data.mixedFormMeta || null);
                     } else {
                         // Fallback handling if an old API response accidentally slips in
                         setSubmissionContent(data.content || "Empty document or non-text attachment.");
@@ -310,6 +314,7 @@ export default function GradingWorkspace() {
                         if (data.nativeGrade) {
                             setSelectedSubmission(prev => ({ ...prev, nativeGrade: data.nativeGrade }));
                         }
+                        setMixedFormMeta(data.mixedFormMeta || null);
                     }
 
                     // Clear major error if this succeeds (in case they just logged back in)
@@ -496,6 +501,13 @@ export default function GradingWorkspace() {
             // Ensure no trailing spaces or non-numeric characters survived
             finalGradeCalculated = finalGradeCalculated.replace(/[^\d.]/g, '').trim();
             if (!finalGradeCalculated) finalGradeCalculated = "N/A";
+
+            // Mixed-format Google Form: AI returned raw essay score — calculate final %
+            if (mixedFormMeta && finalGradeCalculated !== "N/A" && !isNaN(parseFloat(finalGradeCalculated))) {
+                const essayRaw = parseFloat(finalGradeCalculated);
+                const combined = mixedFormMeta.earnedAutoPoints + essayRaw;
+                finalGradeCalculated = Math.min(100, Math.round((combined / mixedFormMeta.totalMaxPoints) * 100)).toString();
+            }
 
             const isLate = selectedSubmission.late || selectedSubmission.assignmentSubmission?.late;
             if (isLate && applyLatePenalty) {
@@ -955,6 +967,14 @@ export default function GradingWorkspace() {
                         finalGradeCalculated = finalGradeCalculated.replace(/[^\d.]/g, '').trim();
                         if (!finalGradeCalculated) finalGradeCalculated = "N/A";
 
+                        // Mixed-format Google Form: AI returned raw essay score — calculate final %
+                        const subMixedMeta = docData.mixedFormMeta || null;
+                        if (subMixedMeta && finalGradeCalculated !== "N/A" && !isNaN(parseFloat(finalGradeCalculated))) {
+                            const essayRaw = parseFloat(finalGradeCalculated);
+                            const combined = subMixedMeta.earnedAutoPoints + essayRaw;
+                            finalGradeCalculated = Math.min(100, Math.round((combined / subMixedMeta.totalMaxPoints) * 100)).toString();
+                        }
+
                         // Late Penalty
                         const isLate = sub.late || sub.assignmentSubmission?.late;
                         if (isLate && applyLatePenalty) {
@@ -1094,7 +1114,7 @@ export default function GradingWorkspace() {
                     <div className="min-w-0 pr-4">
                         <h2 className="text-[10px] font-black uppercase tracking-widest text-indigo-500 dark:text-indigo-400 mb-0.5">{courseName || "Loading Course..."}</h2>
                         <h1 className="text-lg font-bold text-slate-900 dark:text-slate-50 leading-tight truncate">
-                            {assignmentName || "Grading Workspace"} <span className="text-xs text-indigo-500 ml-2 bg-indigo-50 px-2 py-1 rounded">v3.82</span>
+                            {assignmentName || "Grading Workspace"} <span className="text-xs text-indigo-500 ml-2 bg-indigo-50 px-2 py-1 rounded">v3.83</span>
                         </h1>
                     </div>
                 </div>
