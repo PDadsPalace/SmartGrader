@@ -174,11 +174,12 @@ export async function extractGoogleFormResponse(accessToken, formId, studentEmai
         
         // 5. Calculate Native Score if available
         let autoGrade = null;
+        let earnedAutoPoints = 0; // declared here so it's in scope for the return statement
         const totalMaxPoints = maxAutoPoints + maxManualPoints;
 
         if (studentFormResponse.totalScore !== undefined) {
             // studentFormResponse.totalScore represents the points they got from the strictly auto-graded section
-            const earnedAutoPoints = studentFormResponse.totalScore;
+            earnedAutoPoints = studentFormResponse.totalScore;
             
             if (maxManualPoints > 0) {
                  // The form has essays. We MUST NOT return a nativeGrade so the system sends it to the AI.
