@@ -7,14 +7,14 @@ export default function PrivacyPolicy() {
             <section className="mb-8">
                 <h2 className="text-xl font-semibold mb-3">1. Introduction</h2>
                 <p className="mb-4">
-                    Welcome to Autograder. We respect your privacy and are committed to protecting your personal data. This privacy policy will inform you as to how we look after your personal data when you visit our website and tell you about your privacy rights and how the law protects you.
+                    Welcome to SmartGrader. We respect your privacy and are committed to protecting your personal data. This privacy policy will inform you as to how we look after your personal data when you visit our website and tell you about your privacy rights and how the law protects you.
                 </p>
             </section>
 
             <section className="mb-8">
                 <h2 className="text-xl font-semibold mb-3">2. Data We Collect</h2>
                 <p className="mb-4">
-                    Autograder is an application designed to assist educators in grading assignments using Google Classroom. To provide this service, we collect and process the following data through the Google API:
+                    SmartGrader is an application designed to assist educators in grading assignments using Google Classroom. To provide this service, we collect and process the following data through the Google API:
                 </p>
                 <ul className="list-disc pl-6 mb-4 space-y-2">
                     <li><strong>Profile Information:</strong> Your name and email address to create and manage your account.</li>
@@ -26,10 +26,10 @@ export default function PrivacyPolicy() {
 
             <section className="mb-8">
                 <h2 className="text-xl font-semibold mb-3">3. How We Use Your Data</h2>
-                <p className="mb-4">We use the information we collect solely for the purpose of providing and improving the Autograder service:</p>
+                <p className="mb-4">We use the information we collect solely for the purpose of providing and improving the SmartGrader service:</p>
                 <ul className="list-disc pl-6 mb-4 space-y-2">
                     <li>To authenticate your identity and manage your session.</li>
-                    <li>To display your courses and assignments within the Autograder interface.</li>
+                    <li>To display your courses and assignments within the SmartGrader interface.</li>
                     <li>To read student submissions and pass them to our AI grading algorithms.</li>
                     <li>We do <strong>not</strong> use your Google user data to develop, improve, or train generalized AI and/or ML models.</li>
                 </ul>
@@ -38,7 +38,7 @@ export default function PrivacyPolicy() {
             <section className="mb-8 bg-blue-50 p-6 rounded-lg border border-blue-100">
                 <h2 className="text-xl font-semibold mb-3 text-blue-900">4. Google API Services User Data Policy</h2>
                 <p className="mb-2 text-blue-800">
-                    Autograder's use and transfer to any other app of information received from Google APIs will adhere to the{' '}
+                    SmartGrader's use and transfer to any other app of information received from Google APIs will adhere to the{' '}
                     <a href="https://developers.google.com/terms/api-services-user-data-policy" target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">
                         Google API Services User Data Policy
                     </a>
@@ -66,7 +66,7 @@ export default function PrivacyPolicy() {
             <section className="mb-8">
                 <h2 className="text-xl font-semibold mb-3">7. Your Rights</h2>
                 <p className="mb-4">
-                    You have the right to revoke Autograder's access to your Google account at any time by visiting your Google Account settings page. If you choose to revoke access, Autograder will no longer be able to function.
+                    You have the right to revoke SmartGrader's access to your Google account at any time by visiting your Google Account settings page. If you choose to revoke access, SmartGrader will no longer be able to function.
                 </p>
             </section>
 
@@ -75,7 +75,7 @@ export default function PrivacyPolicy() {
                 <p className="mb-4">
                     If there are any questions regarding this privacy policy, you may contact us using the information below:
                 </p>
-                <p className="font-medium">Phil Panfili (philpanf@gmail.com)</p>
+                <p className="font-medium">Phil Panfili (phil@smartgrader.app)</p>
             </section>
         </div>
     );

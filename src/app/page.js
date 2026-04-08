@@ -148,7 +148,7 @@ export default function Home() {
             <div className="mx-auto bg-indigo-100 dark:bg-indigo-900/60 w-16 h-16 rounded-full flex items-center justify-center mb-4">
               <GraduationCap className="w-8 h-8 text-indigo-600 dark:text-indigo-400" />
             </div>
-            <h1 className="text-3xl font-bold tracking-tight text-slate-900 dark:text-slate-50">ClassRoomApp</h1>
+            <h1 className="text-3xl font-bold tracking-tight text-slate-900 dark:text-slate-50">SmartGrader</h1>
             <p className="text-slate-500 dark:text-slate-400 leading-relaxed">
               Connect your Google Classroom to get started with AI-assisted grading and automated PowerSchool exports.
             </p>
@@ -178,7 +178,7 @@ export default function Home() {
         <div className="h-16 flex items-center px-6 border-b border-slate-100 dark:border-slate-800">
           <div className="flex items-center gap-2 text-indigo-600 dark:text-indigo-400 font-bold text-lg tracking-tight">
             <GraduationCap className="w-6 h-6" />
-            ClassRoomApp
+            SmartGrader
           </div>
         </div>
 
