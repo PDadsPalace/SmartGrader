@@ -1,0 +1,351 @@
+Organization: Smartgrader
+Application: SmartGrader Initial Scan
+ESOF APPSEC ADA CASA - BASIC REPORT
+Vulnerability Assessment Report - ESOF AppSec ADA by TAC Security   2
+Security is in Our DNA
+1st Largest
+Auditor
+Market share (almost 100%) of
+UPI assessment.
+Fortune 500
+Oil and Gas company is
+protected by us.
+2nd Largest Financial
+Institution
+Of countries application
+assessor.
+10 Billion Transactions
+Assessed on more than 200+
+banking applications.
+3rd Largest telecom
+Company's
+End to end security
+assessor.
+Top Fortune 500
+Companies vulnerabilities have
+been managed by ESOF
+AppSec ADA.
+Vulnerability Assessment Report - ESOF AppSec ADA by TAC Security   3
+Executive Summary
+CASA has built upon the industry-recognized standards of the OWASP's Application
+Security Verification Standard (ASVS) to provide a consistent set of requirements to
+harden security for any application. Further, CASA provides a uniform way to perform
+trusted assurance assessments of these requirements when such assessments are
+required for applications with potential access to sensitive data.
+There is no "one size fits all solution" when it comes to evaluating application risk to
+securing user data. The CASA assessment acknowledges this reality and is adapted with
+a risk-based, multi-tier assessment approach to evaluate application risk based on user,
+scope, and other application specific items.
+Vulnerability Assessment Report - ESOF AppSec ADA by TAC Security   4
+Risk Classification
+Critical
+Risk
+These vulnerabilities can allow attackers to take complete control of your web applications and web
+servers. In exploiting this type of vulnerability, attackers could carry out a range of malicious acts.
+High
+Risk
+A High severity vulnerability, which means that on exploiting such vulnerabilities, attackers, can view
+information about your system that helps them find or exploit other vulnerabilities that enable them to
+access sensitive user and administrator information.
+Medium
+Risk
+Potential weakness in controls, which could develop into an exposure. Or Issues that represent areas
+of concern and may impact controls. They should be addressed reasonably promptly.
+Low
+Risk
+Potential weaknesses in controls, which in combination with other weaknesses can develop into
+exposure. Suggested improvements not immediately/directly affecting controls.
+Info
+Risk
+Weaknesses mentioned under these sections are informational and are best practices. Either these
+weaknesses cannot be exploited directly or are very difficult to exploit due to multiple constrains.
+Vulnerability Assessment Report - ESOF AppSec ADA by TAC Security   5
+ESOF AppSec ADA Cyber Score Classification
+9.4
+Target
+- Title:     SmartGrader Initial Scan
+- Source:https://smartgrader.app
+Testing Details
+Start Date Apr 8, 2026 13:16:01
+Finish Date Apr 9, 2026 05:31:19
+Vulnerability Assessment Report - ESOF AppSec ADA by TAC Security   6
+Observation Summary
+Sr. No. Vulnerabilities Severity Status
+1 Cross-Domain Misconfiguration Low Open
+2 Proxy Disclosure Low Open
+3 Permissions Policy Header Not Set Info Open
+4 Modern Web Application Info Open
+5 Retrieved from Cache Info Open
+6 Storable but Non-Cacheable Content Info Open
+Note: All the vulnerabilities need to be patched to pass the CASA Tier 2 & Tier 3 assessments.
+Vulnerability Assessment Report - ESOF AppSec ADA by TAC Security   7
+ 1          Cross-Domain Misconfiguration
+Severity Level: Low
+CWEID: 264
+Status: Open
+Description:
+Web browser data loading may be possible, due to a Cross Origin Resource Sharing (CORS) misconfiguration on
+the web server.
+Vulnerable URL
+https://smartgrader.app
+Remedies:
+Ensure that sensitive data is not available in an unauthenticated manner (using IP address white-listing, for
+instance).
+Configure the "Access-Control-Allow-Origin" HTTP header to a more restrictive set of domains, or remove all
+CORS headers entirely, to allow the web browser to enforce the Same Origin Policy (SOP) in a more restrictive
+manner.
+Evidence Url:
+https://smartgrader.app
+Access-Control-Allow-Origin: *
+Evidence Response:
+The CORS misconfiguration on the web server permits cross-domain read requests from arbitrary
+third party domains, using unauthenticated APIs on this domain. Web browser implementations
+do not permit arbitrary third parties to read the response from authenticated APIs, however.
+This reduces the risk somewhat. This misconfiguration could be used by an attacker to access
+data that is available in an unauthenticated manner, but which uses some other form of
+security, such as IP address white-listing.
+https://smartgrader.app/
+Access-Control-Allow-Origin: *
+The CORS misconfiguration on the web server permits cross-domain read requests from arbitrary
+third party domains, using unauthenticated APIs on this domain. Web browser implementations
+do not permit arbitrary third parties to read the response from authenticated APIs, however.
+This reduces the risk somewhat. This misconfiguration could be used by an attacker to access
+data that is available in an unauthenticated manner, but which uses some other form of
+security, such as IP address white-listing.
+https://smartgrader.app/_next/static/chunks/17ce77l5p-f9n.css
+Access-Control-Allow-Origin: *
+The CORS misconfiguration on the web server permits cross-domain read requests from arbitrary
+third party domains, using unauthenticated APIs on this domain. Web browser implementations
+do not permit arbitrary third parties to read the response from authenticated APIs, however.
+This reduces the risk somewhat. This misconfiguration could be used by an attacker to access
+data that is available in an unauthenticated manner, but which uses some other form of
+security, such as IP address white-listing.
+https://smartgrader.app/robots.txt
+Vulnerability Assessment Report - ESOF AppSec ADA by TAC Security   8
+Access-Control-Allow-Origin: *
+The CORS misconfiguration on the web server permits cross-domain read requests from arbitrary
+third party domains, using unauthenticated APIs on this domain. Web browser implementations
+do not permit arbitrary third parties to read the response from authenticated APIs, however.
+This reduces the risk somewhat. This misconfiguration could be used by an attacker to access
+data that is available in an unauthenticated manner, but which uses some other form of
+security, such as IP address white-listing.
+https://smartgrader.app/sitemap.xml
+Access-Control-Allow-Origin: *
+The CORS misconfiguration on the web server permits cross-domain read requests from arbitrary
+third party domains, using unauthenticated APIs on this domain. Web browser implementations
+do not permit arbitrary third parties to read the response from authenticated APIs, however.
+This reduces the risk somewhat. This misconfiguration could be used by an attacker to access
+data that is available in an unauthenticated manner, but which uses some other form of
+security, such as IP address white-listing.
+Reference:
+https://vulncat.fortify.com/en/detail?category=HTML5&subcategory=Overly%20Permissive%20CORS%20Policy
+Vulnerability Assessment Report - ESOF AppSec ADA by TAC Security   9
+ 2          Proxy Disclosure
+Severity Level: Low
+CWEID: 204
+Status: Open
+Description:
+1 proxy server(s) were detected or fingerprinted. This information helps a potential attacker to determine
+- A list of targets for an attack against the application.
+- Potential vulnerabilities on the proxy servers that service the application.
+- The presence or absence of any proxy-based components that might cause attacks against the application to be
+detected, prevented, or mitigated.
+Vulnerable URL
+https://smartgrader.app
+Remedies:
+Disable the 'TRACE' method on the proxy servers, as well as the origin web/application server.
+Disable the 'OPTIONS' method on the proxy servers, as well as the origin web/application server, if it is not
+required for other purposes, such as 'CORS' (Cross Origin Resource Sharing).
+Configure the web and application servers with custom error pages, to prevent 'fingerprintable' product-specific
+error pages being leaked to the user in the event of HTTP errors, such as 'TRACK' requests for non-existent
+pages.
+Configure all proxies, application servers, and web servers to prevent disclosure of the technology and version
+information in the 'Server' and 'X-Powered-By' HTTP response headers.
+Evidence Url:
+https://smartgrader.app
+Evidence Response:
+Using the TRACE, OPTIONS, and TRACK methods, the following proxy servers have been identified
+between ZAP and the application/web server: - Vercel The following web/application server has
+been identified: - Vercel
+https://smartgrader.app/
+Using the TRACE, OPTIONS, and TRACK methods, the following proxy servers have been identified
+between ZAP and the application/web server: - Vercel The following web/application server has
+been identified: - Vercel
+https://smartgrader.app/_next
+Using the TRACE, OPTIONS, and TRACK methods, the following proxy servers have been identified
+between ZAP and the application/web server: - Vercel The following web/application server has
+been identified: - Vercel
+https://smartgrader.app/_next/static
+Using the TRACE, OPTIONS, and TRACK methods, the following proxy servers have been identified
+between ZAP and the application/web server: - Vercel The following web/application server has
+been identified: - Vercel
+https://smartgrader.app/_next/static/chunks
+Vulnerability Assessment Report - ESOF AppSec ADA by TAC Security   10
+Using the TRACE, OPTIONS, and TRACK methods, the following proxy servers have been identified
+between ZAP and the application/web server: - Vercel The following web/application server has
+been identified: - Vercel
+Reference:
+https://datatracker.ietf.org/doc/html/rfc7231#section-5.1.2
+Vulnerability Assessment Report - ESOF AppSec ADA by TAC Security   11
+ 3          Permissions Policy Header Not Set
+Severity Level: Info
+CWEID: 693
+Status: Open
+Description:
+Permissions Policy Header is an added layer of security that helps to restrict from unauthorized access or usage of
+browser/client features by web resources. This policy ensures the user privacy by limiting or specifying the features
+of the browsers can be used by the web resources. Permissions Policy provides a set of standard HTTP headers
+that allow website owners to limit which features of browsers can be used by the page such as camera,
+microphone, location, full screen etc.
+Vulnerable URL
+https://smartgrader.app
+Remedies:
+Ensure that your web server, application server, load balancer, etc. is configured to set the Permissions-Policy
+header.
+Evidence Url:
+https://smartgrader.app
+https://smartgrader.app/
+https://smartgrader.app/robots.txt
+https://smartgrader.app/sitemap.xml
+https://smartgrader.app
+https://smartgrader.app/
+https://smartgrader.app
+https://smartgrader.app/
+https://smartgrader.app
+https://smartgrader.app/
+https://smartgrader.app/_next/static/chunks/0ht900cau6_ur.js
+https://smartgrader.app/robots.txt
+https://smartgrader.app/sitemap.xml
+Reference:
+https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/Permissions-Policy
+https://developer.chrome.com/blog/feature-policy/
+https://scotthelme.co.uk/a-new-security-header-feature-policy/
+https://w3c.github.io/webappsec-feature-policy/
+https://www.smashingmagazine.com/2018/12/feature-policy/
+Vulnerability Assessment Report - ESOF AppSec ADA by TAC Security   12
+ 4          Modern Web Application
+Severity Level: Info
+CWEID: -1
+Status: Open
+Description:
+The application appears to be a modern web application. If you need to explore it automatically then the Ajax
+Spider may well be more effective than the standard one.
+Vulnerable URL
+https://smartgrader.app
+Remedies:
+This is an informational alert and so no changes are required.
+Evidence Url:
+https://smartgrader.app
+<script src="/_next/static/chunks/02i7dfk78~t~2.js" async=""></script>
+Evidence Response:
+No links have been found while there are scripts, which is an indication that this is a
+modern web application.
+https://smartgrader.app/
+<script src="/_next/static/chunks/02i7dfk78~t~2.js" async=""></script>
+No links have been found while there are scripts, which is an indication that this is a
+modern web application.
+https://smartgrader.app/robots.txt
+<script src="/_next/static/chunks/02i7dfk78~t~2.js" async=""></script>
+No links have been found while there are scripts, which is an indication that this is a
+modern web application.
+https://smartgrader.app/sitemap.xml
+<script src="/_next/static/chunks/02i7dfk78~t~2.js" async=""></script>
+No links have been found while there are scripts, which is an indication that this is a
+modern web application.
+Vulnerability Assessment Report - ESOF AppSec ADA by TAC Security   13
+ 5          Retrieved from Cache
+Severity Level: Info
+CWEID: 525
+Status: Open
+Description:
+The content was retrieved from a shared cache. If the response data is sensitive, personal or user-specific, this
+may result in sensitive information being leaked. In some cases, this may even result in a user gaining complete
+control of the session of another user, depending on the configuration of the caching components in use in their
+environment. This is primarily an issue where caching servers such as "proxy" caches are configured on the local
+network. This configuration is typically found in corporate or educational environments, for instance.
+Vulnerable URL
+https://smartgrader.app
+Remedies:
+Validate that the response does not contain sensitive, personal or user-specific information. If it does, consider
+the use of the following HTTP response headers, to limit, or prevent the content being stored and retrieved from
+the cache by another user:
+Cache-Control: no-cache, no-store, must-revalidate, private
+Pragma: no-cache
+Expires: 0
+This configuration directs both HTTP 1.0 and HTTP 1.1 compliant caching servers to not store the response, and
+to not retrieve the response (without validation) from the cache, in response to a similar request.
+Evidence Url:
+https://smartgrader.app
+public, max-age=0, must-revalidate
+https://smartgrader.app/
+public, max-age=0, must-revalidate
+https://smartgrader.app
+Age: 59514
+Evidence Response:
+The presence of the 'Age' header indicates that a HTTP/1.1 compliant caching server is in
+use.
+https://smartgrader.app/
+Age: 59512
+The presence of the 'Age' header indicates that a HTTP/1.1 compliant caching server is in
+use.
+https://smartgrader.app/
+Age: 59514
+The presence of the 'Age' header indicates that a HTTP/1.1 compliant caching server is in
+use.
+https://smartgrader.app/robots.txt
+Age: 0
+The presence of the 'Age' header indicates that a HTTP/1.1 compliant caching server is in
+Vulnerability Assessment Report - ESOF AppSec ADA by TAC Security   14
+use.
+https://smartgrader.app/sitemap.xml
+Age: 0
+The presence of the 'Age' header indicates that a HTTP/1.1 compliant caching server is in
+use.
+Reference:
+https://datatracker.ietf.org/doc/html/rfc7234
+https://datatracker.ietf.org/doc/html/rfc7231
+https://www.rfc-editor.org/rfc/rfc9110.html
+Vulnerability Assessment Report - ESOF AppSec ADA by TAC Security   15
+ 6          Storable but Non-Cacheable Content
+Severity Level: Info
+CWEID: 524
+Status: Open
+Description:
+The response contents are storable by caching components such as proxy servers, but will not be retrieved directly
+from the cache, without validating the request upstream, in response to similar requests from other users.
+Vulnerable URL
+https://smartgrader.app
+Evidence Url:
+https://smartgrader.app/_next/static/chunks/02i7dfk78~t~2.js
+max-age=31536000
+https://smartgrader.app/_next/static/chunks/0ht900cau6_ur.js
+max-age=31536000
+https://smartgrader.app/_next/static/chunks/17ce77l5p-f9n.css
+max-age=31536000
+https://smartgrader.app/_next/static/media/797e433ab948586e-s.p.0.q-h669a_dqa.w off2
+max-age=31536000
+https://smartgrader.app/_next/static/media/caa3a2e1cccd8315-s.p.16t1db8_9y2o~.w off2
+max-age=31536000
+https://smartgrader.app
+max-age=0
+https://smartgrader.app/
+max-age=0
+https://smartgrader.app/favicon.ico?favicon.0x3dzn~oxb6tn.ico
+max-age=0
+https://smartgrader.app/robots.txt
+max-age=0
+https://smartgrader.app/sitemap.xml
+max-age=0
+Reference:
+https://datatracker.ietf.org/doc/html/rfc7234
+https://datatracker.ietf.org/doc/html/rfc7231
+https://www.w3.org/Protocols/rfc2616/rfc2616-sec13.html
+Vulnerability Assessment Report - ESOF AppSec ADA by TAC Security   16
+mail@tacsecurity.com | tacsecurity.com
+© 2026 TAC Security. All rights reserved. This document is copyright protected. No information contained
+herein, shall, for any purpose other than its intended purpose, be disclosed, transmitted, duplicated, and
+used in whole and/or in part without prior written permission of TAC Security. Any redistribution or
+reproduction of part or all of the contents in any form in prohibited and will tantamount to a breach. TAC
+Security Solutions does not claim this report to be error free, even though every care has been taken to
+prepare the same.
+Copyright © TAC Security - 2026-2027 All Rights Reserved.
