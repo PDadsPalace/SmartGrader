@@ -403,10 +403,10 @@ export default function GradingWorkspace() {
             }
             
             // Phase 10: Auto-Apply Native Grades (Google Forms)
-            // If the document extractor yielded a valid nativeGrade AND the user didn't provide any rubric/key,
-            // force it and skip AI. If they provided a rubric, they want the AI to grade the open-ended parts.
-            const hasRubricInstructions = rubric.trim() || useStudentAsKey || rubricFile;
-            if (selectedSubmission.nativeGrade != null && !hasRubricInstructions) {
+            // If the document extractor yielded a valid nativeGrade (meaning a 100% strictly auto-graded form),
+            // ALWAYS force it and skip AI regardless of rubric. We do not want the AI hallucinating grades
+            // for multiple choice tests just because the teacher left a default rubric selected.
+            if (selectedSubmission.nativeGrade != null) {
                  let finalNativeGrade = selectedSubmission.nativeGrade;
                  let feedback = "Grade automatically imported from Google Forms native score. No AI analysis was run.";
                  

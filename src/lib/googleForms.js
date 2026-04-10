@@ -174,13 +174,11 @@ export async function extractGoogleFormResponse(accessToken, formId, studentEmai
         
         // 5. Calculate Native Score if available
         let autoGrade = null;
-        let earnedAutoPoints = 0; // declared here so it's in scope for the return statement
+        // If the form is a quiz but they got 0 points, totalScore may be omitted in the API response.
+        let earnedAutoPoints = studentFormResponse.totalScore || 0; 
         const totalMaxPoints = maxAutoPoints + maxManualPoints;
 
-        if (studentFormResponse.totalScore !== undefined) {
-            // studentFormResponse.totalScore represents the points they got from the strictly auto-graded section
-            earnedAutoPoints = studentFormResponse.totalScore;
-            
+        if (totalMaxPoints > 0) {
             if (maxManualPoints > 0) {
                  // The form has essays. We MUST NOT return a nativeGrade so the system sends it to the AI.
                  // We will append a header instructing the AI on the exact math to perform.
@@ -193,7 +191,7 @@ export async function extractGoogleFormResponse(accessToken, formId, studentEmai
                  header += `====================================================\n\n`;
                  
                  compiledText = header + compiledText;
-            } else if (totalMaxPoints > 0) {
+            } else {
                  // 100% strictly auto-graded Google Form (No essays). We can return the native percentage directly and skip AI.
                  autoGrade = Math.round((earnedAutoPoints / totalMaxPoints) * 100).toString();
                  compiledText = `[NATIVE GRADE: ${earnedAutoPoints} / ${totalMaxPoints} (${autoGrade}%)]\n\n` + compiledText;
