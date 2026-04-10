@@ -865,8 +865,8 @@ export default function GradingWorkspace() {
                         return; // Skip the API call for this student
                     }
                     
-                    const hasRubricInstructions = rubric.trim() || useStudentAsKey || rubricFile;
-                    if (docData.nativeGrade != null && !hasRubricInstructions) {
+                    // Check if doc details indicates nativeGrade override (ALWAYS FORCE if 100% auto graded)
+                    if (docData.nativeGrade != null) {
                          let finalNativeGrade = docData.nativeGrade;
                          let feedback = "Grade automatically imported from Google Forms native score. No AI analysis was run.";
                          
