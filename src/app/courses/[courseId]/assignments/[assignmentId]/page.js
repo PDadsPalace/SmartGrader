@@ -62,6 +62,9 @@ export default function GradingWorkspace() {
     const [keyStudentId, setKeyStudentId] = useState("");
     const [filterMode, setFilterMode] = useState("All");
 
+    // Google Form Integration UI Modal
+    const [showFormModal, setShowFormModal] = useState(false);
+
     // Bypass Features
     const [bypassMissingWork, setBypassMissingWork] = useState(false);
     const [missingWorkGrade, setMissingWorkGrade] = useState("0");
@@ -231,6 +234,19 @@ export default function GradingWorkspace() {
             const withGrade = subs.filter(s => s.assignedGrade != null).length;
             const withAttachments = subs.filter(s => s.assignmentSubmission?.attachments?.length > 0).length;
             if (withGrade >= Math.ceil(subs.length / 2) && withAttachments === 0) return true;
+        }
+        return false;
+    };
+
+    // Helper to detect Google Forms
+    const detectGoogleForm = (details) => {
+        if (!details) return false;
+        if (details.materials) {
+            for (const mat of details.materials) {
+                if (mat.link?.url?.includes("docs.google.com/forms")) return true;
+                if (mat.form?.formUrl) return true;
+                if (mat.driveFile?.driveFile?.alternateLink?.includes("docs.google.com/forms")) return true;
+            }
         }
         return false;
     };
@@ -813,6 +829,8 @@ export default function GradingWorkspace() {
                     
                     // Check if a binary file was attached but is extremely small (e.g., blank PDF converted from blank sheet)
                     const isBlankBinary = inlineDataForAI && inlineDataForAI.data && inlineDataForAI.data.length < 25000;
+                    
+                    const isUnmatchedForm = submissionTextForAI && submissionTextForAI.startsWith("Unmatched Form:");
 
                     const isTextEmpty = !submissionTextForAI ||
                         submissionTextForAI === "Empty document or non-text attachment." ||
@@ -823,6 +841,16 @@ export default function GradingWorkspace() {
                         isMissingFormError ||
                         submissionTextForAI.trim().length === 0 ||
                         isBlankBinary;
+
+                    if (isUnmatchedForm) {
+                        const resultObj = { grade: "Unmatched", feedback: submissionTextForAI };
+                        setBatchResults(prev => ({ ...prev, [sub.id]: resultObj }));
+
+                        if (selectedSubmission && selectedSubmission.id === sub.id) {
+                            setAiFeedback(resultObj);
+                        }
+                        return; // Skip the API call for this student
+                    }
 
                     if (isFormError) {
                         const resultObj = { grade: "Error", feedback: submissionTextForAI };
@@ -1630,7 +1658,13 @@ export default function GradingWorkspace() {
                                                     </button>
                                                 ) : (
                                                     <button
-                                                        onClick={() => handleGradeAll(false)}
+                                                        onClick={() => {
+                                                            if (detectGoogleForm(assignmentInfo)) {
+                                                                setShowFormModal(true);
+                                                            } else {
+                                                                handleGradeAll(false);
+                                                            }
+                                                        }}
                                                         disabled={grading || loading}
                                                         className="flex-1 flex items-center justify-center gap-2 bg-indigo-100 hover:bg-indigo-200 text-indigo-700 dark:bg-indigo-900/60 dark:text-indigo-400 dark:hover:bg-indigo-800 py-2.5 px-4 rounded-lg font-bold transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-sm hover:shadow active:scale-[0.99]"
                                                     >
@@ -1769,6 +1803,56 @@ export default function GradingWorkspace() {
                     )}
                 </div>
             </div>
+
+            {/* Google Form Interceptor Modal */}
+            {showFormModal && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm animate-in fade-in duration-200">
+                    <div className="bg-white dark:bg-slate-950 rounded-2xl shadow-xl w-full max-w-md overflow-hidden animate-in zoom-in-95 duration-200">
+                        <div className="px-6 py-4 border-b border-slate-200 dark:border-slate-800 flex justify-between items-center bg-indigo-50/50">
+                            <h2 className="text-lg font-bold text-indigo-900 dark:text-indigo-300 flex items-center gap-2">
+                                <ListChecks className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
+                                Google Form Detected
+                            </h2>
+                            <button onClick={() => setShowFormModal(false)} className="text-slate-400 hover:text-slate-600 dark:text-slate-300 p-1 rounded-lg transition-colors hover:bg-slate-100 dark:hover:bg-slate-800 dark:bg-slate-800">
+                                <X className="w-5 h-5" />
+                            </button>
+                        </div>
+
+                        <div className="p-6 space-y-4 text-sm text-slate-700 dark:text-slate-300">
+                            <div className="flex items-start gap-3 p-3 bg-indigo-50 text-indigo-800 rounded-lg border border-indigo-200/50 dark:bg-indigo-900/30 dark:border-indigo-800 dark:text-indigo-300">
+                                <Sparkles className="w-5 h-5 flex-shrink-0 mt-0.5 text-indigo-600 dark:text-indigo-400" />
+                                <p>
+                                    SmartGraider has verified this assignment contains a Google Form.
+                                </p>
+                            </div>
+                            <p className="font-medium text-slate-900 dark:text-slate-50">
+                                <strong>Strictly Auto-Graded Forms:</strong> If your form is exclusively multiple-choice, we will securely bypass AI and import the native grades automatically.
+                            </p>
+                            <p className="font-medium text-slate-900 dark:text-slate-50">
+                                <strong>Mixed Forms (Essays):</strong> If your form contains open-ended questions, AI will specifically grade only those missing sections.
+                            </p>
+                        </div>
+
+                        <div className="px-6 py-4 bg-slate-50 dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800 flex justify-end gap-3 rounded-b-2xl">
+                            <button
+                                onClick={() => setShowFormModal(false)}
+                                className="px-4 py-2 font-bold text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 transition-colors"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                onClick={() => {
+                                    setShowFormModal(false);
+                                    handleGradeAll(false);
+                                }}
+                                className="px-5 py-2 font-bold text-white bg-indigo-600 hover:bg-indigo-700 rounded-xl shadow-sm transition-all focus:ring-2 focus:ring-indigo-500 outline-none"
+                            >
+                                Proceed with AI Guardrails
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* PowerSchool Map Interceptor Modal */}
             {showRosterModal && (

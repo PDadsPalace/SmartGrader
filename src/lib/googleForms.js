@@ -70,6 +70,16 @@ export async function extractGoogleFormResponse(accessToken, formId, studentEmai
             }
         });
 
+        // 1b. The Auditor: Check if this is a zero-point form
+        const totalMaxPoints = maxAutoPoints + maxManualPoints;
+        if (totalMaxPoints === 0) {
+            return {
+                isBinary: false,
+                mimeType: 'text/plain',
+                content: "Error: No point values assigned. The Google Form has 0 total possible points. Either it's not set as a quiz, or point values weren't assigned to questions. Please fix the form or grade it manually."
+            };
+        }
+
         // 2. Fetch Form Responses
         const responsesObj = await forms.forms.responses.list({ formId });
         const allResponses = responsesObj.data.responses || [];
@@ -87,9 +97,16 @@ export async function extractGoogleFormResponse(accessToken, formId, studentEmai
 
         if (studentEmail) {
             const targetEmail = studentEmail.toLowerCase();
-            studentFormResponse = allResponses.find(r =>
+            const matches = allResponses.filter(r =>
                 r.respondentEmail && r.respondentEmail.toLowerCase() === targetEmail
             );
+            
+            // Duplicate Handling: Pick the highest scoring attempt
+            if (matches.length > 0) {
+                studentFormResponse = matches.reduce((best, current) => {
+                    return ((current.totalScore || 0) > (best.totalScore || 0)) ? current : best;
+                });
+            }
         }
 
         // 3b. Fallback matching using First and Last Name (Strict)
@@ -98,7 +115,7 @@ export async function extractGoogleFormResponse(accessToken, formId, studentEmai
             const targetParts = studentName.toLowerCase().split(' ').filter(p => p.length >= 3);
             const reverseNameClean = targetParts.slice().reverse().join("");
             
-            let bestMatchResponse = null;
+            let bestMatches = [];
             let highestScore = 0;
 
             allResponses.forEach(r => {
@@ -129,15 +146,22 @@ export async function extractGoogleFormResponse(accessToken, formId, studentEmai
                     }
                 }
                 
-                if (score > highestScore && score > 0) {
-                    highestScore = score;
-                    bestMatchResponse = r;
+                if (score > 0) {
+                    if (score > highestScore) {
+                        highestScore = score;
+                        bestMatches = [r];
+                    } else if (score === highestScore) {
+                        bestMatches.push(r);
+                    }
                 }
             });
             
             // Require a threshold indicating a solid exact match
-            if (highestScore >= 50) {
-                studentFormResponse = bestMatchResponse;
+            if (highestScore >= 50 && bestMatches.length > 0) {
+                // Duplicate Handling for Name Matches: Pick highest score
+                studentFormResponse = bestMatches.reduce((best, current) => {
+                    return ((current.totalScore || 0) > (best.totalScore || 0)) ? current : best;
+                });
             }
         }
 
@@ -145,7 +169,7 @@ export async function extractGoogleFormResponse(accessToken, formId, studentEmai
             return {
                 isBinary: false,
                 mimeType: 'text/plain',
-                content: `Error: Could not find a Google Form submission for '${studentName || studentEmail}'. Note: Because your school hides student emails, the AI tried to search the form answers for the student's name, but failed. Ensure the Google Form explicitly asks the student for their First and Last name!`
+                content: `Unmatched Form: Could not find a Google Form submission for '${studentName || studentEmail}'.`
             };
         }
 

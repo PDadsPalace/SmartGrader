@@ -104,7 +104,7 @@ CRITICAL REMINDER: Look closely at the student's file and text. If both are comp
             properties: {
                 suggested_grade: {
                     type: "string",
-                    description: "A number between 0 and 100 representing the score. YOU MUST return ONLY the raw integer (e.g., 85)."
+                    description: "The raw number of points earned. Do not normalize to 100. Return ONLY the raw number (e.g., '15' or '85')."
                 },
                 ...(generateFeedback ? {
                     feedback_text: {
@@ -116,17 +116,33 @@ CRITICAL REMINDER: Look closely at the student's file and text. If both are comp
             required: ["suggested_grade"]
         };
 
-        // Call Gemini 2.5 Flash
-        const response = await ai.models.generateContent({
-            model: 'gemini-2.5-flash',
-            contents: contentsData,
-            config: {
-                systemInstruction: systemInstruction,
-                responseMimeType: "application/json",
-                responseSchema: responseSchema,
-                temperature: 0.1
+        // Call Gemini 2.5 Flash with Retry Logic (Bulletproof Form Feature)
+        let response;
+        let retries = 0;
+        let lastError;
+        
+        while (retries < 2) {
+            try {
+                response = await ai.models.generateContent({
+                    model: 'gemini-2.5-flash',
+                    contents: contentsData,
+                    config: {
+                        systemInstruction: systemInstruction,
+                        responseMimeType: "application/json",
+                        responseSchema: responseSchema,
+                        temperature: 0.1
+                    }
+                });
+                break;
+            } catch (apiErr) {
+                lastError = apiErr;
+                retries++;
+                console.log(`Gemini API call failed (Attempt ${retries}). Retrying...`, apiErr.message);
+                if (retries >= 2) throw lastError;
+                // Wait 1 second before retry to allow rate limits to cool down
+                await new Promise(resolve => setTimeout(resolve, 1000));
             }
-        });
+        }
 
         // Parse the JSON string
         let parsedResult;
