@@ -14,7 +14,7 @@ const MOCK_STUDENT_METADATA = {
 export async function POST(request) {
     try {
         const body = await request.json();
-        const { submissionText, rubric, strictness, studentId, studentNotes, rubricFile, studentFile, generateFeedback = true } = body;
+        const { submissionText, rubric, strictness, studentId, studentNotes, rubricFile, studentFile, generateFeedback = true, maxPoints = 100 } = body;
 
         if (!submissionText) {
             return NextResponse.json({ error: "No submission text provided" }, { status: 400 });
@@ -57,9 +57,17 @@ If the submission begins with "!!! ATTENTION AI GRADER: MIXED FORMAT GOOGLE FORM
 
 **YOUR TASK:**
 Evaluate the submission. You must return your evaluation strictly in JSON format.
+
+IF the submission is a MIXED FORMAT GOOGLE FORM (it begins with "!!! ATTENTION AI GRADER..."):
+Return the raw essay total sum as instructed above. DO NOT normalize this to ${maxPoints}.
+
+IF the submission is a REGULAR DOCUMENT OR OTHER FILE:
+The assignment is worth a maximum of ${maxPoints} points. You MUST calculate and return the final numeric score proportionally scaled out of ${maxPoints}. 
+Make sure your "suggested_grade" natively matches the ${maxPoints} point scale (for example, if they got everything right, return ${maxPoints}). Do NOT treat the grade as a generic percentage unless maxPoints is 100.
+
 ${generateFeedback 
-    ? `- Include a "suggested_grade" key with the raw score.\n- Include a "feedback_text" key with a paragraph of constructive feedback directly to the student.`
-    : `- Only return a "suggested_grade" key. Do NOT generate feedback text to maximize speed.`
+    ? `- Include a "suggested_grade" key with your final numeric score.\n- Include a "feedback_text" key with a paragraph of constructive feedback directly to the student.`
+    : `- Only return a "suggested_grade" key.`
 }
 `;
 
@@ -104,7 +112,7 @@ CRITICAL REMINDER: Look closely at the student's file and text. If both are comp
             properties: {
                 suggested_grade: {
                     type: "string",
-                    description: "The raw number of points earned. Do not normalize to 100. Return ONLY the raw number (e.g., '15' or '85')."
+                    description: "The numeric score earned."
                 },
                 ...(generateFeedback ? {
                     feedback_text: {

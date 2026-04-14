@@ -488,7 +488,8 @@ export default function GradingWorkspace() {
                     studentNotes: studentNotes,
                     studentFile: inlineDataContent,
                     rubricFile: runtimeRubricFile,
-                    generateFeedback: generateFeedback
+                    generateFeedback: generateFeedback,
+                    maxPoints: assignmentInfo?.maxPoints || 100
                 })
             });
 
@@ -501,14 +502,11 @@ export default function GradingWorkspace() {
             let rawGrade = String(data.grade || "N/A");
             let finalGradeCalculated = rawGrade;
             
-            // First look for something formatted like "85%"
             let percentMatch = rawGrade.match(/(\d+(?:\.\d+)?)%/);
             if (percentMatch) {
                 finalGradeCalculated = percentMatch[1];
             } else {
-                // Look for an exact whole number pattern (0 to 100) anywhere in the string
-                // ignoring any "92.5/100" style fractions
-                let numMatch = rawGrade.match(/\b([0-9]|[1-8][0-9]|9[0-9]|100)(?:\.\d+)?\b/);
+                let numMatch = rawGrade.match(/\d+(?:\.\d+)?/);
                 if (numMatch) {
                     finalGradeCalculated = numMatch[0];
                 }
@@ -940,7 +938,8 @@ export default function GradingWorkspace() {
                                 studentNotes: sNotes,
                                 studentFile: inlineDataForAI,
                                 rubricFile: baselineRubricFile,
-                                generateFeedback: generateFeedback
+                                generateFeedback: generateFeedback,
+                                maxPoints: assignmentInfo?.maxPoints || 100
                             })
                         });
                         
@@ -978,14 +977,11 @@ export default function GradingWorkspace() {
                         let rawGrade = String(gradeData.grade ?? "N/A");
                         let finalGradeCalculated = rawGrade;
                         
-                        // First look for something formatted like "85%"
                         let percentMatch = rawGrade.match(/(\d+(?:\.\d+)?)%/);
                         if (percentMatch) {
                             finalGradeCalculated = percentMatch[1];
                         } else {
-                            // Look for an exact whole number pattern (0 to 100) anywhere in the string
-                            // ignoring any "92.5/100" style fractions
-                            let numMatch = rawGrade.match(/\b([0-9]|[1-8][0-9]|9[0-9]|100)(?:\.\d+)?\b/);
+                            let numMatch = rawGrade.match(/\d+(?:\.\d+)?/);
                             if (numMatch) {
                                 finalGradeCalculated = numMatch[0];
                             }
@@ -1142,7 +1138,7 @@ export default function GradingWorkspace() {
                     <div className="min-w-0 pr-4">
                         <h2 className="text-[10px] font-black uppercase tracking-widest text-indigo-500 dark:text-indigo-400 mb-0.5">{courseName || "Loading Course..."}</h2>
                         <h1 className="text-lg font-bold text-slate-900 dark:text-slate-50 leading-tight truncate">
-                            {assignmentName || "Grading Workspace"} <span className="text-xs text-indigo-500 ml-2 bg-indigo-50 px-2 py-1 rounded">v3.85</span>
+                            {assignmentName || "Grading Workspace"} <span className="text-xs text-indigo-500 ml-2 bg-indigo-50 px-2 py-1 rounded">v3.86</span>
                         </h1>
                     </div>
                 </div>
