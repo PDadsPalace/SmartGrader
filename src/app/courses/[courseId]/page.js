@@ -3,8 +3,9 @@
 import { useSession } from "next-auth/react";
 import { useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
-import { BookOpen, GraduationCap, ArrowLeft, Calendar, FileText, CheckCircle2, Plus, X, Link as LinkIcon, Youtube, File as FileIcon, RefreshCw, Zap } from "lucide-react";
+import { BookOpen, ArrowLeft, Calendar, FileText, CheckCircle2, Plus, X, Link as LinkIcon, Youtube, File as FileIcon, RefreshCw, Zap } from "lucide-react";
 import useDrivePicker from "react-google-drive-picker";
+import { BrandLogo } from "@/components/BrandLogo";
 
 export default function CourseAssignments() {
     const { data: session, status } = useSession();
@@ -82,7 +83,7 @@ export default function CourseAssignments() {
     const [reuseError, setReuseError] = useState(null);
 
     useEffect(() => {
-        const savedHidden = localStorage.getItem("smartgrader_hidden_courses");
+        const savedHidden = localStorage.getItem("smartgraider_hidden_courses");
         if (savedHidden) {
             try {
                 setHiddenCourseIds(JSON.parse(savedHidden));
@@ -197,13 +198,13 @@ export default function CourseAssignments() {
 
             // Save schedules to default next time
             if (Object.keys(payload.targetCourseSchedules).length > 0) {
-                const existingStr = localStorage.getItem("smartgrader_class_schedules");
+                const existingStr = localStorage.getItem("smartgraider_class_schedules");
                 let existing = {};
                 if (existingStr) {
                     try { existing = JSON.parse(existingStr); } catch (e) { }
                 }
                 const merged = { ...existing, ...payload.targetCourseSchedules };
-                localStorage.setItem("smartgrader_class_schedules", JSON.stringify(merged));
+                localStorage.setItem("smartgraider_class_schedules", JSON.stringify(merged));
             }
 
             // If scheduling is enabled, generate ISO strings from local browser time for each class
@@ -358,7 +359,7 @@ export default function CourseAssignments() {
 
     useEffect(() => {
         if (isCreateModalOpen) {
-            const savedStr = localStorage.getItem("smartgrader_class_schedules");
+            const savedStr = localStorage.getItem("smartgraider_class_schedules");
             if (savedStr) {
                 try {
                     const parsed = JSON.parse(savedStr);
@@ -384,10 +385,10 @@ export default function CourseAssignments() {
             <div className="min-h-screen bg-slate-50 dark:bg-slate-900 flex">
                 {/* Sidebar - Same as Dashboard */}
                 <aside className="w-64 bg-white dark:bg-slate-950 border-r border-slate-200 dark:border-slate-800 flex flex-col hidden md:flex">
-                    <div className="h-16 flex items-center px-6 border-b border-slate-100 dark:border-slate-800 cursor-pointer" onClick={() => router.push('/')}>
-                        <div className="flex items-center gap-2 text-indigo-600 dark:text-indigo-400 font-bold text-lg tracking-tight">
-                            <GraduationCap className="w-6 h-6" />
-                            SmartGrader
+                    <div className="h-24 flex items-center px-6 border-b border-slate-100 dark:border-slate-800 cursor-pointer" onClick={() => router.push('/')}>
+                        <div className="flex items-center gap-1 text-lg">
+                            <img src="/robot-avatar.png" alt="SmartGrAIder Mascot" className="w-16 h-16 object-contain" />
+                            <BrandLogo />
                         </div>
                     </div>
 

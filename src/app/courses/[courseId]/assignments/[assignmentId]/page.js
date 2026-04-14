@@ -1872,7 +1872,7 @@ export default function GradingWorkspace() {
                             <div className="flex items-start gap-3 p-3 bg-amber-50 text-amber-800 rounded-lg border border-amber-200/50">
                                 <AlertTriangle className="w-5 h-5 flex-shrink-0 mt-0.5 text-amber-600" />
                                 <p>
-                                    To export an <strong>exact PowerSchool CSV</strong>, SmartGrader needs to learn how to map Google Classroom names to your PowerSchool Student Numbers.
+                                    To export an <strong>exact PowerSchool CSV</strong>, SmartGrAIder needs to learn how to map Google Classroom names to your PowerSchool Student Numbers.
                                 </p>
                             </div>
                             <p className="font-medium text-slate-900 dark:text-slate-50">

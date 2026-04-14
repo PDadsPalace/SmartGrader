@@ -2,9 +2,10 @@
 
 import { useSession, signIn, signOut } from "next-auth/react";
 import { useTheme } from "next-themes";
-import { LogIn, LogOut, BookOpen, GraduationCap, Users, Eye, EyeOff, Settings, ArrowUp, ArrowDown, Palette, Moon, Sun } from "lucide-react";
+import { LogIn, LogOut, BookOpen, Users, Eye, EyeOff, Settings, ArrowUp, ArrowDown, Palette, Moon, Sun } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { BrandLogo } from "@/components/BrandLogo";
 
 const COURSE_COLORS = [
   { id: 'indigo', bg: 'bg-indigo-50', text: 'text-indigo-700 dark:text-indigo-400', active: 'bg-indigo-500', hex: '#6366f1' },
@@ -33,19 +34,19 @@ export default function Home() {
 
   useEffect(() => {
     setMounted(true);
-    const savedHidden = localStorage.getItem("smartgrader_hidden_courses");
+    const savedHidden = localStorage.getItem("smartgraider_hidden_courses");
     if (savedHidden) {
       try {
         setHiddenCourseIds(JSON.parse(savedHidden));
       } catch (e) { }
     }
-    const savedOrder = localStorage.getItem("smartgrader_course_order");
+    const savedOrder = localStorage.getItem("smartgraider_course_order");
     if (savedOrder) {
       try {
         setCourseOrder(JSON.parse(savedOrder));
       } catch (e) { }
     }
-    const savedColors = localStorage.getItem("smartgrader_course_colors");
+    const savedColors = localStorage.getItem("smartgraider_course_colors");
     if (savedColors) {
       try {
         setCourseColors(JSON.parse(savedColors));
@@ -62,14 +63,14 @@ export default function Home() {
       newHidden = [...hiddenCourseIds, courseId];
     }
     setHiddenCourseIds(newHidden);
-    localStorage.setItem("smartgrader_hidden_courses", JSON.stringify(newHidden));
+    localStorage.setItem("smartgraider_hidden_courses", JSON.stringify(newHidden));
   };
 
   const updateCourseColor = (e, courseId, colorObj) => {
     e.stopPropagation();
     setCourseColors(prev => {
       const next = { ...prev, [courseId]: colorObj };
-      localStorage.setItem("smartgrader_course_colors", JSON.stringify(next));
+      localStorage.setItem("smartgraider_course_colors", JSON.stringify(next));
       return next;
     });
     setOpenPaletteId(null);
@@ -86,7 +87,7 @@ export default function Home() {
         .then((data) => {
           // Sort courses based on standard local storage order map
           let loadedCourses = data.courses || [];
-          const savedOrder = localStorage.getItem("smartgrader_course_order");
+          const savedOrder = localStorage.getItem("smartgraider_course_order");
           if (savedOrder) {
             try {
               const orderArr = JSON.parse(savedOrder);
@@ -128,7 +129,7 @@ export default function Home() {
     // Save new mapping
     const newOrder = newCourses.map(c => c.id);
     setCourseOrder(newOrder);
-    localStorage.setItem("smartgrader_course_order", JSON.stringify(newOrder));
+    localStorage.setItem("smartgraider_course_order", JSON.stringify(newOrder));
   };
 
   if (status === "loading") {
@@ -145,12 +146,17 @@ export default function Home() {
       <div className="flex flex-col items-center justify-center min-h-screen p-4 bg-gradient-to-br from-blue-50 to-indigo-50">
         <div className="w-full max-w-md bg-white dark:bg-slate-950 rounded-2xl shadow-xl overflow-hidden border border-slate-100 dark:border-slate-800">
           <div className="p-8 text-center space-y-6">
-            <div className="mx-auto bg-indigo-100 dark:bg-indigo-900/60 w-16 h-16 rounded-full flex items-center justify-center mb-4">
-              <GraduationCap className="w-8 h-8 text-indigo-600 dark:text-indigo-400" />
+            <div className="mx-auto w-full flex items-center justify-center pt-2">
+              <img 
+                src="/mascot.jpg" 
+                alt="SmartGrAIder Mascot" 
+                className="w-full max-w-[300px] h-auto object-contain rounded-xl shadow-sm" 
+              />
             </div>
-            <h1 className="text-3xl font-bold tracking-tight text-slate-900 dark:text-slate-50">SmartGrader</h1>
-            <p className="text-slate-500 dark:text-slate-400 leading-relaxed">
-              Connect your Google Classroom to get started with AI-assisted grading and automated PowerSchool exports.
+            <h1 className="text-3xl"><BrandLogo /></h1>
+            <p className="text-slate-500 dark:text-slate-400 leading-relaxed font-medium">
+              AI-Powered Bulk Grading.
+              <span className="text-xs mt-3 block font-semibold text-blue-600 dark:text-blue-400 uppercase tracking-wider">Works with Google Classroom™</span>
             </p>
             <button
               onClick={() => signIn("google")}
@@ -175,10 +181,10 @@ export default function Home() {
     <div className="min-h-screen bg-slate-50 dark:bg-slate-900 flex">
       {/* Sidebar */}
       <aside className="w-64 bg-white dark:bg-slate-950 border-r border-slate-200 dark:border-slate-800 flex flex-col hidden md:flex">
-        <div className="h-16 flex items-center px-6 border-b border-slate-100 dark:border-slate-800">
-          <div className="flex items-center gap-2 text-indigo-600 dark:text-indigo-400 font-bold text-lg tracking-tight">
-            <GraduationCap className="w-6 h-6" />
-            SmartGrader
+        <div className="h-24 flex items-center px-6 border-b border-slate-100 dark:border-slate-800">
+          <div className="flex items-center gap-1 text-lg">
+            <img src="/robot-avatar.png" alt="SmartGrAIder Mascot" className="w-16 h-16 object-contain" />
+            <BrandLogo />
           </div>
         </div>
 

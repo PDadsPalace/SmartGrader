@@ -13,8 +13,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata = {
-  title: "SmartGrader AI",
-  description: "AI Assisted Grading for Google Classroom",
+  title: "SmartGrAIder",
+  description: "AI Assisted Grading - Works with Google Classroom™",
   verification: {
     google: 'riqJWBrcqpk5_URHq-CB20let4dpA258o8mm3CioCQQ',
   },
