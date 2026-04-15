@@ -14,7 +14,7 @@ const MOCK_STUDENT_METADATA = {
 export async function POST(request) {
     try {
         const body = await request.json();
-        const { submissionText, rubric, strictness, studentId, studentNotes, rubricFile, studentFile, generateFeedback = true, maxPoints = 100 } = body;
+        const { submissionText, rubric, strictness, studentId, studentNotes, rubricFile, studentFile, studentFiles, generateFeedback = true, maxPoints = 100 } = body;
 
         if (!submissionText) {
             return NextResponse.json({ error: "No submission text provided" }, { status: 400 });
@@ -98,7 +98,16 @@ CRITICAL REMINDER: Look closely at the student's file and text. If both are comp
                 }
             });
         }
-        if (studentFile && studentFile.data) {
+        if (studentFiles && Array.isArray(studentFiles)) {
+            for (const sf of studentFiles) {
+                contentsData.push({
+                    inlineData: {
+                        data: sf.data,
+                        mimeType: sf.mimeType
+                    }
+                });
+            }
+        } else if (studentFile && studentFile.data) {
             contentsData.push({
                 inlineData: {
                     data: studentFile.data,

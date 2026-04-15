@@ -73,9 +73,9 @@ export async function GET(request, { params }) {
 
         // 2. Fall back to standard Google Drive Files (Docs, Sheets, PDFs)
         const attachments = submission.assignmentSubmission?.attachments || [];
-        const driveAttachment = attachments.find(att => att.driveFile);
+        const driveAttachments = attachments.filter(att => att.driveFile);
 
-        if (!driveAttachment) {
+        if (driveAttachments.length === 0) {
             // Check if they attached a Google Form as a generic 'Link' by mistake
             const linkAttachment = courseWork.materials?.find(mat => mat.link?.url?.includes("docs.google.com/forms"));
             if (linkAttachment) {
@@ -85,16 +85,37 @@ export async function GET(request, { params }) {
             return NextResponse.json({ content: "No Supported Attachments Found. Materials attached to assignment: " + JSON.stringify(courseWork.materials) });
         }
 
-        const fileId = driveAttachment.driveFile.id;
+        let combinedText = "";
+        let multipleBinaries = [];
 
-        // Use the Drive API utility to export the text
-        const exportData = await exportGoogleDocToText(session.accessToken, fileId);
-
-        if (!exportData) {
-            throw new Error("Failed to export document.");
+        // Export all valid Google Drive files sequentially to avoid rate limits
+        for (const att of driveAttachments) {
+            const fileId = att.driveFile.id;
+            const exportData = await exportGoogleDocToText(session.accessToken, fileId);
+            
+            if (exportData) {
+                if (exportData.isBinary) {
+                    multipleBinaries.push({
+                        data: exportData.data,
+                        mimeType: exportData.mimeType,
+                        title: att.driveFile.title || "Attached File"
+                    });
+                } else {
+                    combinedText += `\n\n--- Attachment: ${att.driveFile.title || "File"} ---\n${exportData.data}`;
+                }
+            }
         }
 
-        return NextResponse.json(exportData);
+        if (multipleBinaries.length === 0 && !combinedText.trim()) {
+             throw new Error("Failed to export documents.");
+        }
+
+        return NextResponse.json({
+            data: combinedText ? combinedText.trim() : "See attached student files.",
+            isBinary: multipleBinaries.length > 0,
+            multipleBinaries: multipleBinaries,
+            mimeType: multipleBinaries.length > 0 ? multipleBinaries[0].mimeType : 'text/plain'
+        });
 
     } catch (error) {
         console.error("API Route Error fetching specific submission:", error);

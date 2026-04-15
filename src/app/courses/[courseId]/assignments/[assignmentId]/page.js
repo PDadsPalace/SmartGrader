@@ -33,6 +33,7 @@ export default function GradingWorkspace() {
     const [submissionContent, setSubmissionContent] = useState("");
     const [submissionMime, setSubmissionMime] = useState(null);
     const [submissionIsBinary, setSubmissionIsBinary] = useState(false);
+    const [multipleBinaries, setMultipleBinaries] = useState([]);
     const [contentLoading, setContentLoading] = useState(false);
 
     // States
@@ -318,6 +319,7 @@ export default function GradingWorkspace() {
                         setSubmissionContent(data.data);
                         setSubmissionMime(data.mimeType);
                         setSubmissionIsBinary(data.isBinary);
+                        setMultipleBinaries(data.multipleBinaries || []);
                         if (data.nativeGrade) {
                             setSelectedSubmission(prev => ({ ...prev, nativeGrade: data.nativeGrade }));
                         }
@@ -327,6 +329,7 @@ export default function GradingWorkspace() {
                         setSubmissionContent(data.content || "Empty document or non-text attachment.");
                         setSubmissionIsBinary(false);
                         setSubmissionMime("text/plain");
+                        setMultipleBinaries([]);
                         if (data.nativeGrade) {
                             setSelectedSubmission(prev => ({ ...prev, nativeGrade: data.nativeGrade }));
                         }
@@ -353,10 +356,13 @@ export default function GradingWorkspace() {
 
         try {
             let inlineDataContent = null;
+            let inlineDataFilesForAI = [];
             let submissionTextOnly = submissionContent;
 
-            // If it's a binary file like XLSX, send it as an inline attachment instead of text
-            if (submissionIsBinary && submissionContent) {
+            if (multipleBinaries && multipleBinaries.length > 0) {
+                 submissionTextOnly = submissionContent ? submissionContent + "\n\nSee attached files." : "See attached student files.";
+                 inlineDataFilesForAI = multipleBinaries.map(mb => ({ data: mb.data, mimeType: mb.mimeType }));
+            } else if (submissionIsBinary && submissionContent) {
                 submissionTextOnly = "See attached student file.";
                 inlineDataContent = {
                     data: submissionContent,
@@ -486,6 +492,7 @@ export default function GradingWorkspace() {
                     studentId: selectedSubmission.userId,
                     studentNotes: studentNotes,
                     studentFile: inlineDataContent,
+                    studentFiles: inlineDataFilesForAI,
                     rubricFile: runtimeRubricFile,
                     generateFeedback: generateFeedback,
                     maxPoints: assignmentInfo?.maxPoints || 100
@@ -798,8 +805,14 @@ export default function GradingWorkspace() {
 
                     let submissionTextForAI = "Empty document or non-text attachment.";
                     let inlineDataForAI = null;
+                    let inlineDataFilesForAI = [];
 
-                    if (docData.data && docData.isBinary) {
+                    if (docData.multipleBinaries && docData.multipleBinaries.length > 0) {
+                        submissionTextForAI = docData.data ? docData.data + "\n\nSee attached files." : "See attached student files.";
+                        inlineDataFilesForAI = docData.multipleBinaries.map(mb => ({ data: mb.data, mimeType: mb.mimeType }));
+                        // keep inlineDataForAI as the first one just in case we need fallback logic
+                        inlineDataForAI = { data: docData.multipleBinaries[0].data, mimeType: docData.multipleBinaries[0].mimeType };
+                    } else if (docData.data && docData.isBinary) {
                         submissionTextForAI = "See attached student file.";
                         inlineDataForAI = {
                             data: docData.data,
@@ -934,6 +947,7 @@ export default function GradingWorkspace() {
                                 studentId: sub.userId,
                                 studentNotes: sNotes,
                                 studentFile: inlineDataForAI,
+                                studentFiles: inlineDataFilesForAI,
                                 rubricFile: baselineRubricFile,
                                 generateFeedback: generateFeedback,
                                 maxPoints: assignmentInfo?.maxPoints || 100
@@ -1135,7 +1149,7 @@ export default function GradingWorkspace() {
                     <div className="min-w-0 pr-4">
                         <h2 className="text-[10px] font-black uppercase tracking-widest text-indigo-500 dark:text-indigo-400 mb-0.5">{courseName || "Loading Course..."}</h2>
                         <h1 className="text-lg font-bold text-slate-900 dark:text-slate-50 leading-tight truncate">
-                            {assignmentName || "Grading Workspace"} <span className="text-xs text-indigo-500 ml-2 bg-indigo-50 px-2 py-1 rounded">v3.87</span>
+                            {assignmentName || "Grading Workspace"} <span className="text-xs text-indigo-500 ml-2 bg-indigo-50 px-2 py-1 rounded">v3.88</span>
                         </h1>
                     </div>
                 </div>
