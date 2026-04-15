@@ -373,7 +373,6 @@ export default function GradingWorkspace() {
                 submissionTextOnly.startsWith("No responses found")
             );
 
-            const isNotTurnedIn = selectedSubmission.state !== "TURNED_IN" && !isFormSubmission && !isFormError;
             const isTextEmpty = !submissionTextOnly ||
                 submissionTextOnly === "Empty document or non-text attachment." ||
                 submissionTextOnly.includes("No attachments found") ||
@@ -390,7 +389,7 @@ export default function GradingWorkspace() {
                 return;
             }
 
-            if (isNotTurnedIn || (isTextEmpty && !inlineDataContent)) {
+            if (isTextEmpty && !inlineDataContent) {
                 let mockGrade = "50";
                 let mockFeedback = "Missing assignment. No file or text was submitted.";
 
@@ -823,8 +822,6 @@ export default function GradingWorkspace() {
                         submissionTextForAI.startsWith("Fatal Error:")
                     );
 
-                    const isNotTurnedIn = sub.state !== "TURNED_IN" && !isFormSubmission && !isFormError && !isMissingFormError;
-                    
                     // Check if a binary file was attached but is extremely small (e.g., blank PDF converted from blank sheet)
                     const isBlankBinary = inlineDataForAI && inlineDataForAI.data && inlineDataForAI.data.length < 25000;
                     
@@ -860,7 +857,7 @@ export default function GradingWorkspace() {
                         return; // Skip the API call for this student
                     }
 
-                    if (isNotTurnedIn || isTextEmpty) {
+                    if (isTextEmpty) {
                         let mockGrade = "50";
                         let mockFeedback = "Missing assignment. No file or text was submitted.";
 
@@ -1138,7 +1135,7 @@ export default function GradingWorkspace() {
                     <div className="min-w-0 pr-4">
                         <h2 className="text-[10px] font-black uppercase tracking-widest text-indigo-500 dark:text-indigo-400 mb-0.5">{courseName || "Loading Course..."}</h2>
                         <h1 className="text-lg font-bold text-slate-900 dark:text-slate-50 leading-tight truncate">
-                            {assignmentName || "Grading Workspace"} <span className="text-xs text-indigo-500 ml-2 bg-indigo-50 px-2 py-1 rounded">v3.86</span>
+                            {assignmentName || "Grading Workspace"} <span className="text-xs text-indigo-500 ml-2 bg-indigo-50 px-2 py-1 rounded">v3.87</span>
                         </h1>
                     </div>
                 </div>
