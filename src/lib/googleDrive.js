@@ -58,7 +58,7 @@ export async function exportGoogleDocToText(accessToken, fileId) {
 
                     if (isBinary && !isSupportedInlineData) {
                         resolve({
-                            data: `The student submitted an unsupported file format (${finalMimeType}). The AI currently only supports Google Docs, Google Sheets, PDFs, text files, and images. Please manually review their file from Google Classroom.`,
+                            data: `Fatal Error: The student submitted an unsupported file format (${finalMimeType}). The AI currently only supports Google Docs, Google Sheets, PDFs, text files, and images.\n\nTo prevent this, ensure your Google Classroom attachments are native Google Workspace formats (like Google Sheets), rather than Microsoft formats (.xls / .docx).`,
                             mimeType: 'text/plain',
                             isBinary: false
                         });
