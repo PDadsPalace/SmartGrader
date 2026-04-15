@@ -87,14 +87,39 @@ export async function GET(request, { params }) {
 
         let combinedText = "";
         let multipleBinaries = [];
+        let totalBinaryChars = 0;
+        const BINARY_LIMIT = 2500000; // ~2.5MB limit for base64 to avoid Vercel 4.5MB JSON payload limits
 
         // Export all valid Google Drive files sequentially to avoid rate limits
         for (const att of driveAttachments) {
             const fileId = att.driveFile.id;
+
+            // Optional Optimization: Skip files that are exactly the teacher's original 'View Only' materials
+            let isOriginalMaterial = false;
+            if (courseWork.materials) {
+                for (const mat of courseWork.materials) {
+                    if (mat.driveFile && mat.driveFile.driveFile && mat.driveFile.driveFile.id === fileId) {
+                        isOriginalMaterial = true;
+                        break;
+                    }
+                }
+            }
+            // If it's a teacher's view-only instruction file, and we have other files, skip it to save payload space
+            if (isOriginalMaterial && driveAttachments.length > 1) {
+                continue;
+            }
+
             const exportData = await exportGoogleDocToText(session.accessToken, fileId);
             
             if (exportData) {
                 if (exportData.isBinary) {
+                    // Prevent pushing Vercel Serverless Function over 4.5MB by culling massive attachments
+                    if (totalBinaryChars + exportData.data.length > BINARY_LIMIT && multipleBinaries.length > 0) {
+                        console.warn(`Skipping attachment ${att.driveFile.title} to stay within Vercel body physical limits.`);
+                        continue;
+                    }
+                    totalBinaryChars += exportData.data.length;
+
                     multipleBinaries.push({
                         data: exportData.data,
                         mimeType: exportData.mimeType,
