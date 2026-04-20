@@ -160,7 +160,7 @@ export default function Home() {
               </button>
               <button
                 onClick={() => signIn("google")}
-                className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm ml-2 hidden sm:inline-block"
+                className="bg-[#4a2e7c] hover:opacity-90 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm ml-2 hidden sm:inline-block"
               >
                 Get Started
               </button>
@@ -173,14 +173,15 @@ export default function Home() {
           <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/grid-me.png')] opacity-20"></div>
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10 text-center flex flex-col items-center">
             
+            <div className="flex justify-center mb-10 transform scale-[2.25]"><BrandLogo /></div>
+            
             <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-blue-100 border border-blue-200 text-blue-800 text-xs font-bold uppercase tracking-wider mb-8 shadow-sm">
               <ShieldCheck className="w-4 h-4 text-blue-600" />
               Verified & Approved by Google Trust & Safety
             </div>
 
-            <div className="flex justify-center mb-4 transform scale-150"><BrandLogo /></div>
             <h1 className="text-5xl md:text-6xl lg:text-7xl font-extrabold tracking-tight text-slate-900 mb-6 max-w-4xl mx-auto leading-tight">
-              Reclaim Your Weekends with <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-600 to-violet-600">AI-Powered Grading</span>
+              Reclaim Your Weekends with <span className="text-[#4a2e7c]">AI-Powered Grading</span>
             </h1>
             
             <p className="text-xl text-slate-600 mb-10 max-w-2xl mx-auto leading-relaxed">
@@ -286,7 +287,7 @@ export default function Home() {
             <div>
               <button
                 onClick={() => signIn("google")}
-                className="inline-flex items-center gap-2 bg-white text-indigo-600 rounded-xl py-4 px-8 font-bold text-lg hover:bg-slate-50 transition-colors shadow-lg active:scale-95"
+                className="inline-flex items-center gap-2 bg-white text-[#4a2e7c] rounded-xl py-4 px-8 font-bold text-lg hover:bg-slate-50 transition-colors shadow-lg active:scale-95"
               >
                 Start Free Trial
                 <ArrowRight className="w-5 h-5" />
