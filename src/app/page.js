@@ -160,7 +160,7 @@ export default function Home() {
               </button>
               <button
                 onClick={() => signIn("google")}
-                className="bg-[#4a2e7c] hover:opacity-90 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm ml-2 hidden sm:inline-block"
+                className="bg-[#760296] hover:opacity-90 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm ml-2 hidden sm:inline-block"
               >
                 Get Started
               </button>
@@ -181,7 +181,7 @@ export default function Home() {
             </div>
 
             <h1 className="text-5xl md:text-6xl lg:text-7xl font-extrabold tracking-tight text-slate-900 mb-6 max-w-4xl mx-auto leading-tight">
-              Reclaim Your Weekends with <span className="text-[#4a2e7c]">AI-Powered Grading</span>
+              Reclaim Your Weekends with <span className="text-[#760296]">AI-Powered Grading</span>
             </h1>
             
             <p className="text-xl text-slate-600 mb-10 max-w-2xl mx-auto leading-relaxed">
@@ -287,7 +287,7 @@ export default function Home() {
             <div>
               <button
                 onClick={() => signIn("google")}
-                className="inline-flex items-center gap-2 bg-white text-[#4a2e7c] rounded-xl py-4 px-8 font-bold text-lg hover:bg-slate-50 transition-colors shadow-lg active:scale-95"
+                className="inline-flex items-center gap-2 bg-white text-[#760296] rounded-xl py-4 px-8 font-bold text-lg hover:bg-slate-50 transition-colors shadow-lg active:scale-95"
               >
                 Start Free Trial
                 <ArrowRight className="w-5 h-5" />
@@ -329,7 +329,7 @@ export default function Home() {
         </div>
 
         <div className="flex-1 p-4 space-y-2">
-          <div className="flex items-center gap-3 px-3 py-2 text-slate-600 dark:text-slate-300 font-medium rounded-lg bg-indigo-50 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-400">
+          <div className="flex items-center gap-3 px-3 py-2 text-slate-600 dark:text-slate-300 font-medium rounded-lg bg-purple-50 dark:bg-purple-900/20 text-[#760296] dark:text-purple-400">
             <BookOpen className="w-5 h-5" />
             My Classes
           </div>
@@ -352,7 +352,7 @@ export default function Home() {
           {mounted && (
             <button
               onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
-              className="w-full flex items-center gap-2 px-3 py-2 text-sm font-medium text-slate-600 dark:text-slate-300 hover:text-indigo-600 dark:text-indigo-400 hover:bg-slate-100 dark:hover:bg-slate-800 dark:bg-slate-800 rounded-lg transition-colors mb-1"
+              className="w-full flex items-center gap-2 px-3 py-2 text-sm font-medium text-slate-600 dark:text-slate-300 hover:text-[#760296] dark:text-indigo-400 hover:bg-slate-100 dark:hover:bg-slate-800 dark:bg-slate-800 rounded-lg transition-colors mb-1"
             >
               {theme === "dark" ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
               {theme === "dark" ? "Light Mode" : "Dark Mode"}
@@ -375,7 +375,7 @@ export default function Home() {
           {courses.length > 0 && (
             <button
               onClick={() => setShowHidden(!showHidden)}
-              className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${showHidden ? 'bg-indigo-100 dark:bg-indigo-900/60 text-indigo-700 dark:text-indigo-400' : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'}`}
+              className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${showHidden ? 'bg-purple-100 dark:bg-purple-900/40 text-[#760296] dark:text-purple-400' : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'}`}
             >
               <Settings className="w-4 h-4" />
               {showHidden ? "Done Managing" : "Manage Classes"}
