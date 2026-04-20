@@ -178,6 +178,7 @@ export default function Home() {
               Verified & Approved by Google Trust & Safety
             </div>
 
+            <div className="flex justify-center mb-4 transform scale-150"><BrandLogo /></div>
             <h1 className="text-5xl md:text-6xl lg:text-7xl font-extrabold tracking-tight text-slate-900 mb-6 max-w-4xl mx-auto leading-tight">
               Reclaim Your Weekends with <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-600 to-violet-600">AI-Powered Grading</span>
             </h1>
@@ -280,14 +281,17 @@ export default function Home() {
         <section className="py-24 bg-indigo-600">
           <div className="max-w-4xl mx-auto px-4 text-center">
             <h2 className="text-4xl font-bold text-white mb-6">Ready to get your weekends back?</h2>
-            <p className="text-indigo-100 text-lg mb-10">Join other educators using SmartGrAIder to grade smarter, not harder.</p>
-            <button
-              onClick={() => signIn("google")}
-              className="inline-flex items-center gap-2 bg-white text-indigo-600 rounded-xl py-4 px-8 font-bold text-lg hover:bg-slate-50 transition-colors shadow-lg active:scale-95"
-            >
-              Get Started for Free
-              <ArrowRight className="w-5 h-5" />
-            </button>
+            <p className="text-indigo-100 text-lg mb-4">Join other educators using SmartGrAIder to grade smarter, not harder.</p>
+            <p className="text-white/80 font-medium mb-10 text-sm bg-white/10 py-1.5 px-4 rounded-full inline-block border border-white/20">First class + 12 students completely free. No credit card required.</p>
+            <div>
+              <button
+                onClick={() => signIn("google")}
+                className="inline-flex items-center gap-2 bg-white text-indigo-600 rounded-xl py-4 px-8 font-bold text-lg hover:bg-slate-50 transition-colors shadow-lg active:scale-95"
+              >
+                Start Free Trial
+                <ArrowRight className="w-5 h-5" />
+              </button>
+            </div>
           </div>
         </section>
 
