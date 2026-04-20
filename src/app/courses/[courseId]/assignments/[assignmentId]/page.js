@@ -1380,10 +1380,22 @@ export default function GradingWorkspace() {
                                     {selectedSubmission.studentProfile?.name?.fullName}'s Work
                                 </h3>
 
-                                {contentLoading ? (
-                                    <div className="flex items-center gap-3 text-slate-500 dark:text-slate-400 justify-center p-8 bg-slate-50 dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800">
-                                        <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-indigo-600"></div>
-                                        Fetching Document from Drive...
+                                {contentLoading || grading ? (
+                                    <div className="flex flex-col items-center gap-4 text-slate-500 dark:text-slate-400 justify-center p-8 bg-slate-50 dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 text-center">
+                                        <div className="w-32 h-32 rounded-full overflow-hidden border-4 border-white dark:border-slate-800 shadow-lg bg-slate-200 dark:bg-slate-800">
+                                            <video 
+                                                src="/robot-grading.mp4" 
+                                                autoPlay 
+                                                loop 
+                                                muted 
+                                                playsInline
+                                                className="w-full h-full object-cover pointer-events-none" 
+                                            />
+                                        </div>
+                                        <div className="flex items-center gap-2 font-semibold text-slate-700 dark:text-slate-300">
+                                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-indigo-600"></div>
+                                            {contentLoading ? "Fetching Document from Drive..." : "AI is reading and grading..."}
+                                        </div>
                                     </div>
                                 ) : submissionIsBinary ? (
                                     <div className="bg-indigo-50 dark:bg-indigo-900/40 p-6 rounded-xl text-center border border-indigo-100 shadow-inner my-4">

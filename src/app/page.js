@@ -2,7 +2,7 @@
 
 import { useSession, signIn, signOut } from "next-auth/react";
 import { useTheme } from "next-themes";
-import { LogIn, LogOut, BookOpen, Users, Eye, EyeOff, Settings, ArrowUp, ArrowDown, Palette, Moon, Sun } from "lucide-react";
+import { LogIn, LogOut, BookOpen, Users, Eye, EyeOff, Settings, ArrowUp, ArrowDown, Palette, Moon, Sun, CheckCircle, ArrowRight, ShieldCheck, Zap, Brain } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { BrandLogo } from "@/components/BrandLogo";
@@ -143,35 +143,170 @@ export default function Home() {
   // Not Logged In
   if (!session) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-screen p-4 bg-gradient-to-br from-blue-50 to-indigo-50">
-        <div className="w-full max-w-md bg-white dark:bg-slate-950 rounded-2xl shadow-xl overflow-hidden border border-slate-100 dark:border-slate-800">
-          <div className="p-8 text-center space-y-6">
-            <div className="mx-auto w-full flex items-center justify-center pt-2">
-              <img 
-                src="/mascot.jpg" 
-                alt="SmartGrAIder Mascot" 
-                className="w-full max-w-[300px] h-auto object-contain rounded-xl shadow-sm" 
-              />
+      <div className="min-h-screen bg-slate-50 text-slate-900 font-sans overflow-x-hidden">
+        {/* Navigation */}
+        <nav className="border-b border-slate-200/50 bg-white/80 backdrop-blur-md sticky top-0 z-50">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <img src="/robot-avatar.png" alt="SmartGrAIder Logo" className="w-8 h-8 rounded-full" />
+              <div className="text-xl font-bold tracking-tight"><BrandLogo /></div>
             </div>
-            <h1 className="text-3xl"><BrandLogo /></h1>
-            <p className="text-slate-500 dark:text-slate-400 leading-relaxed font-medium">
-              AI-Powered Bulk Grading.
-              <span className="text-xs mt-3 block font-semibold text-blue-600 dark:text-blue-400 uppercase tracking-wider">Works with Google Classroom™</span>
-            </p>
-            <button
-              onClick={() => signIn("google")}
-              className="w-full flex items-center justify-center gap-2 bg-slate-900 hover:bg-slate-800 text-white rounded-xl py-3 px-4 font-medium transition-all duration-200 active:scale-[0.98]"
-            >
-              <LogIn className="w-4 h-4" />
-              Sign in with Google Account
-            </button>
-            <div className="flex justify-center space-x-4 pt-4 text-sm text-slate-500">
-              <a href="/privacy" className="hover:text-slate-700 dark:hover:text-slate-300">Privacy Policy</a>
-              <span>&middot;</span>
-              <a href="/terms" className="hover:text-slate-700 dark:hover:text-slate-300">Terms of Service</a>
+            <div>
+              <button
+                onClick={() => signIn("google")}
+                className="text-sm font-medium text-slate-600 hover:text-indigo-600 transition-colors px-4 py-2"
+              >
+                Sign In
+              </button>
+              <button
+                onClick={() => signIn("google")}
+                className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm ml-2 hidden sm:inline-block"
+              >
+                Get Started
+              </button>
             </div>
           </div>
-        </div>
+        </nav>
+
+        {/* Hero Section */}
+        <section className="relative pt-20 pb-32 overflow-hidden bg-gradient-to-br from-indigo-50 via-white to-blue-50">
+          <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/grid-me.png')] opacity-20"></div>
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10 text-center flex flex-col items-center">
+            
+            <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-blue-100 border border-blue-200 text-blue-800 text-xs font-bold uppercase tracking-wider mb-8 shadow-sm">
+              <ShieldCheck className="w-4 h-4 text-blue-600" />
+              Verified & Approved by Google Trust & Safety
+            </div>
+
+            <h1 className="text-5xl md:text-6xl lg:text-7xl font-extrabold tracking-tight text-slate-900 mb-6 max-w-4xl mx-auto leading-tight">
+              Reclaim Your Weekends with <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-600 to-violet-600">AI-Powered Grading</span>
+            </h1>
+            
+            <p className="text-xl text-slate-600 mb-10 max-w-2xl mx-auto leading-relaxed">
+              Seamlessly sync with Google Classroom™, apply your custom rubrics, and generate personalized student feedback instantly.
+            </p>
+
+            <div className="flex flex-col sm:flex-row gap-4 justify-center items-center mb-16 w-full max-w-xs sm:max-w-md mx-auto">
+              <button
+                onClick={() => signIn("google")}
+                className="w-full flex items-center justify-center gap-3 bg-white border border-slate-200 hover:bg-slate-50 hover:border-slate-300 text-slate-700 rounded-xl py-4 px-8 font-semibold text-lg transition-all duration-200 shadow-sm active:scale-[0.98]"
+              >
+                <img src="https://www.svgrepo.com/show/475656/google-color.svg" className="w-6 h-6" alt="Google" />
+                Sign in with Google
+              </button>
+            </div>
+
+            {/* Hero Image / Mascot */}
+            <div className="relative mx-auto w-full max-w-lg rounded-2xl shadow-2xl overflow-hidden border-4 border-white transform hover:-translate-y-2 transition-transform duration-500">
+                <video 
+                  src="/robot-grading.mp4" 
+                  autoPlay 
+                  loop 
+                  muted 
+                  playsInline
+                  className="w-full h-auto object-contain bg-slate-900 pointer-events-none" 
+                />
+            </div>
+          </div>
+        </section>
+
+        {/* Features Grid */}
+        <section className="py-24 bg-white border-t border-slate-100">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="text-center mb-16">
+              <h2 className="text-3xl font-bold text-slate-900 mb-4">Built by teachers, for teachers</h2>
+              <p className="text-slate-600 max-w-2xl mx-auto text-lg">Stop agonizing over every essay. Let AI handle the heavy lifting while you maintain complete control over the final grade.</p>
+            </div>
+
+            <div className="grid md:grid-cols-3 gap-8">
+              {[
+                {
+                  icon: <Zap className="w-6 h-6 text-indigo-600" />,
+                  title: "Seamless Sync",
+                  desc: "Connects securely to your Google Classroom. No manual importing or copy-pasting required."
+                },
+                {
+                  icon: <Brain className="w-6 h-6 text-violet-600" />,
+                  title: "Strictness Control",
+                  desc: "You set the rubric and the strictness level. The AI evaluates according to your exact standards."
+                },
+                {
+                  icon: <CheckCircle className="w-6 h-6 text-emerald-600" />,
+                  title: "Drafted Feedback",
+                  desc: "Returns suggested point values and a paragraph of highly specific, constructive feedback for every student."
+                }
+              ].map((feature, i) => (
+                <div key={i} className="p-8 rounded-2xl bg-slate-50 border border-slate-100 hover:shadow-md transition-shadow">
+                  <div className="w-12 h-12 rounded-xl bg-white shadow-sm flex items-center justify-center mb-6">
+                    {feature.icon}
+                  </div>
+                  <h3 className="text-xl font-bold text-slate-900 mb-3">{feature.title}</h3>
+                  <p className="text-slate-600 leading-relaxed">{feature.desc}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        {/* How It Works */}
+        <section className="py-24 bg-slate-900 text-white overflow-hidden">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="text-center mb-16">
+              <h2 className="text-3xl font-bold mb-4">How it works in 3 easy steps</h2>
+            </div>
+            
+            <div className="grid md:grid-cols-3 gap-12 relative max-w-5xl mx-auto">
+              {/* Fake connecting line for desktop */}
+              <div className="hidden md:block absolute top-8 left-1/6 right-1/6 h-0.5 bg-slate-700 w-2/3 mx-auto z-0"></div>
+              
+              {[
+                { step: "1", title: "Select", desc: "Pick an assignment directly from your synced Google Classroom courses." },
+                { step: "2", title: "Configure", desc: "Paste your grading rubric and set your desired strictness level." },
+                { step: "3", title: "Review & Return", desc: "Review AI-suggested grades on your dashboard, then push them back to Google Classroom." }
+              ].map((item, i) => (
+                <div key={i} className="relative z-10 text-center flex flex-col items-center">
+                  <div className="w-16 h-16 rounded-full bg-indigo-600 border-4 border-slate-900 flex items-center justify-center text-2xl font-bold mb-6 shadow-lg shadow-indigo-500/30">
+                    {item.step}
+                  </div>
+                  <h3 className="text-xl font-bold mb-3 text-white">{item.title}</h3>
+                  <p className="text-slate-400">{item.desc}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        {/* Call to Action */}
+        <section className="py-24 bg-indigo-600">
+          <div className="max-w-4xl mx-auto px-4 text-center">
+            <h2 className="text-4xl font-bold text-white mb-6">Ready to get your weekends back?</h2>
+            <p className="text-indigo-100 text-lg mb-10">Join other educators using SmartGrAIder to grade smarter, not harder.</p>
+            <button
+              onClick={() => signIn("google")}
+              className="inline-flex items-center gap-2 bg-white text-indigo-600 rounded-xl py-4 px-8 font-bold text-lg hover:bg-slate-50 transition-colors shadow-lg active:scale-95"
+            >
+              Get Started for Free
+              <ArrowRight className="w-5 h-5" />
+            </button>
+          </div>
+        </section>
+
+        {/* Footer */}
+        <footer className="bg-white border-t border-slate-200 py-12">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col md:flex-row justify-between items-center gap-6">
+            <div className="flex items-center gap-2 text-slate-900 font-bold">
+              <img src="/robot-avatar.png" alt="Logo" className="w-6 h-6 grayscale opacity-80" />
+              <BrandLogo />
+            </div>
+            <div className="flex gap-6 text-sm font-medium text-slate-500">
+              <a href="/privacy" className="hover:text-indigo-600 transition-colors">Privacy Policy</a>
+              <a href="/terms" className="hover:text-indigo-600 transition-colors">Terms of Service</a>
+            </div>
+            <div className="text-sm text-slate-400">
+              &copy; {new Date().getFullYear()} Panfili Corp. All rights reserved.
+            </div>
+          </div>
+        </footer>
       </div>
     );
   }

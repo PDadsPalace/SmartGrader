@@ -1,5 +1,14 @@
 import { NextResponse } from "next/server";
 import { GoogleGenAI } from "@google/genai";
+import { getServerSession } from "next-auth/next";
+import { authOptions } from "../auth/[...nextauth]/route";
+
+// Simple in-memory rate limiter for prototype. 
+// NOTE: On Vercel, this is not persistent across different serverless instances.
+// We recommend a service like Upstash Redis for a true production-grade rate limit.
+const rateLimitMap = new Map();
+const RATE_LIMIT_COUNT = 30; // Max 30 grades per hour
+const RATE_LIMIT_WINDOW = 60 * 60 * 1000; // 1 hour
 
 export const maxDuration = 60; // 60 seconds timeout (maximum for Vercel Free tier)
 export const dynamic = 'force-dynamic';
@@ -13,6 +22,31 @@ const MOCK_STUDENT_METADATA = {
 
 export async function POST(request) {
     try {
+        // ─── Security: Check Session ───
+        const session = await getServerSession(authOptions);
+        if (!session || !session.user?.email) {
+            return NextResponse.json({ error: "Unauthorized. Please log in to grade assignments." }, { status: 401 });
+        }
+
+        // ─── Rate Limiting: Basic Protector ───
+        const userEmail = session.user.email;
+        const now = Date.now();
+        const userData = rateLimitMap.get(userEmail) || { count: 0, startTime: now };
+
+        if (now - userData.startTime > RATE_LIMIT_WINDOW) {
+            userData.count = 0;
+            userData.startTime = now;
+        }
+
+        if (userData.count >= RATE_LIMIT_COUNT) {
+            return NextResponse.json({ 
+                error: "Rate limit exceeded. You've reached your hourly limit of 30 assignments. Please try again in an hour." 
+            }, { status: 429 });
+        }
+
+        userData.count++;
+        rateLimitMap.set(userEmail, userData);
+
         const body = await request.json();
         const { submissionText, rubric, strictness, studentId, studentNotes, rubricFile, studentFile, studentFiles, generateFeedback = true, maxPoints = 100 } = body;
 
