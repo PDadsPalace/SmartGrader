@@ -2,7 +2,7 @@
 
 import { useSession, signIn, signOut } from "next-auth/react";
 import { useTheme } from "next-themes";
-import { LogIn, LogOut, BookOpen, Users, Eye, EyeOff, Settings, ArrowUp, ArrowDown, Palette, Moon, Sun, CheckCircle, ArrowRight, ShieldCheck, Zap, Brain } from "lucide-react";
+import { LogIn, LogOut, BookOpen, Users, Eye, EyeOff, Settings, ArrowUp, ArrowDown, Palette, Moon, Sun, CheckCircle, ArrowRight, ShieldCheck, Zap, Brain, Upload, PlayCircle } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { BrandLogo } from "@/components/BrandLogo";
@@ -184,9 +184,25 @@ export default function Home() {
               Reclaim Your Weekends with <span className="text-[#760296]">AI-Powered Grading</span>
             </h1>
             
-            <p className="text-xl text-slate-600 mb-10 max-w-2xl mx-auto leading-relaxed">
+            <p className="text-xl text-slate-600 mb-8 max-w-2xl mx-auto leading-relaxed">
               Seamlessly sync with Google Classroom™, apply your custom rubrics, and generate personalized student feedback instantly.
             </p>
+
+            {/* Integration Badges */}
+            <div className="flex flex-wrap justify-center gap-3 mb-10">
+              <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white border border-slate-200 text-slate-700 text-sm font-medium shadow-sm">
+                <CheckCircle className="w-4 h-4 text-emerald-500" />
+                Google Classroom™ Sync
+              </div>
+              <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white border border-slate-200 text-slate-700 text-sm font-medium shadow-sm">
+                <Upload className="w-4 h-4 text-[#760296]" />
+                Direct PowerSchool Export
+              </div>
+              <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white border border-slate-200 text-slate-700 text-sm font-medium shadow-sm">
+                <Brain className="w-4 h-4 text-violet-600" />
+                AI-Powered Rubrics
+              </div>
+            </div>
 
             <div className="flex flex-col sm:flex-row gap-4 justify-center items-center mb-16 w-full max-w-xs sm:max-w-md mx-auto">
               <button
@@ -220,7 +236,7 @@ export default function Home() {
               <p className="text-slate-600 max-w-2xl mx-auto text-lg">Stop agonizing over every essay. Let AI handle the heavy lifting while you maintain complete control over the final grade.</p>
             </div>
 
-            <div className="grid md:grid-cols-3 gap-8">
+            <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-8">
               {[
                 {
                   icon: <Zap className="w-6 h-6 text-indigo-600" />,
@@ -236,6 +252,11 @@ export default function Home() {
                   icon: <CheckCircle className="w-6 h-6 text-emerald-600" />,
                   title: "Drafted Feedback",
                   desc: "Returns suggested point values and a paragraph of highly specific, constructive feedback for every student."
+                },
+                {
+                  icon: <Upload className="w-6 h-6 text-[#760296]" />,
+                  title: "PowerSchool Export",
+                  desc: "Export final grades directly to PowerSchool with one click. No manual entry or copy-pasting into your gradebook."
                 }
               ].map((feature, i) => (
                 <div key={i} className="p-8 rounded-2xl bg-slate-50 border border-slate-100 hover:shadow-md transition-shadow">
@@ -246,6 +267,29 @@ export default function Home() {
                   <p className="text-slate-600 leading-relaxed">{feature.desc}</p>
                 </div>
               ))}
+            </div>
+          </div>
+        </section>
+
+        {/* See It In Action — Video Tutorial */}
+        <section className="py-24 bg-gradient-to-b from-slate-50 to-white border-t border-slate-100">
+          <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+            <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-purple-100 border border-purple-200 text-[#760296] text-xs font-bold uppercase tracking-wider mb-6">
+              <PlayCircle className="w-4 h-4" />
+              Video Walkthrough
+            </div>
+            <h2 className="text-3xl font-bold text-slate-900 mb-4">See It In Action</h2>
+            <p className="text-slate-600 max-w-2xl mx-auto text-lg mb-12">Watch how SmartGrAIder grades an entire class in minutes — from syncing your Google Classroom to exporting grades to PowerSchool.</p>
+            
+            {/* Video embed placeholder — replace the div below with a YouTube iframe when ready */}
+            <div className="relative mx-auto w-full max-w-3xl aspect-video rounded-2xl shadow-2xl overflow-hidden border-4 border-white bg-slate-900 flex items-center justify-center cursor-pointer group">
+              <div className="absolute inset-0 bg-gradient-to-br from-[#760296]/20 to-slate-900/60"></div>
+              <div className="relative z-10 flex flex-col items-center gap-4">
+                <div className="w-20 h-20 rounded-full bg-white/90 flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform duration-300">
+                  <PlayCircle className="w-10 h-10 text-[#760296]" />
+                </div>
+                <p className="text-white/80 text-lg font-medium">Tutorial coming soon</p>
+              </div>
             </div>
           </div>
         </section>
