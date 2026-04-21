@@ -1243,6 +1243,20 @@ export default function GradingWorkspace() {
                                     <X className="w-3.5 h-3.5" /> Clear All
                                 </button>
                             )}
+                            {rosterMap && (
+                                <button
+                                    onClick={() => {
+                                        if (window.confirm("Are you sure you want to clear the PowerSchool roster map? You will need to upload a new class roster spreadsheet next time you export.")) {
+                                            setRosterMap(null);
+                                            localStorage.removeItem(`roster_map_${courseId}`);
+                                        }
+                                    }}
+                                    className="text-xs bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700 px-3 py-1.5 rounded-lg font-bold flex items-center gap-1.5 transition-colors mr-2"
+                                    title="Clear saved PowerSchool Roster"
+                                >
+                                    <X className="w-3.5 h-3.5" /> Reset PS Roster
+                                </button>
+                            )}
                             {submissions.length > 0 && Object.keys(batchResults).length > 0 && (
                                 <button
                                     onClick={handleExportCSV}
