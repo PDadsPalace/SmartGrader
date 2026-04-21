@@ -80,6 +80,9 @@ export default function GradingWorkspace() {
     // Mixed-format Google Form metadata (populated when a MIXED form is loaded)
     const [mixedFormMeta, setMixedFormMeta] = useState(null);
 
+    // Privacy Mode (Restricted)
+    const [privacyMode, setPrivacyMode] = useState(false);
+
     useEffect(() => {
         if (status === "unauthenticated") {
             router.push("/");
@@ -115,6 +118,9 @@ export default function GradingWorkspace() {
 
             const savedLatePenalty = localStorage.getItem(`latePenalty_${assignmentName}`);
             if (savedLatePenalty) setLatePenalty(savedLatePenalty);
+            
+            const savedPrivacyMode = localStorage.getItem('privacyMode');
+            if (savedPrivacyMode) setPrivacyMode(savedPrivacyMode === 'true');
         }
     }, [assignmentName]);
 
@@ -133,7 +139,8 @@ export default function GradingWorkspace() {
             localStorage.setItem(`applyLatePenalty_${assignmentName}`, applyLatePenalty);
             localStorage.setItem(`latePenalty_${assignmentName}`, latePenalty);
         }
-    }, [rubric, strictness, rubricFile, bypassMissingWork, missingWorkGrade, applyLatePenalty, latePenalty, assignmentName]);
+        localStorage.setItem('privacyMode', privacyMode);
+    }, [rubric, strictness, rubricFile, bypassMissingWork, missingWorkGrade, applyLatePenalty, latePenalty, assignmentName, privacyMode]);
 
     // Save batchResults when they change
     useEffect(() => {
@@ -1124,6 +1131,14 @@ export default function GradingWorkspace() {
         );
     }
 
+    // Helper for Privacy Mode Masking
+    const getMaskedName = (sub, index) => {
+        if (privacyMode && session?.user?.email === "ppanfili@htsdnj.org") {
+            return `Student ${index + 1}`;
+        }
+        return sub?.studentProfile?.name?.fullName || "Student Name";
+    };
+
     if (!session) return null;
 
     const filteredSubmissions = submissions.filter(sub => {
@@ -1154,6 +1169,19 @@ export default function GradingWorkspace() {
                     </div>
                 </div>
                 <div className="flex items-center gap-3">
+                    {session?.user?.email === "ppanfili@htsdnj.org" && (
+                        <button
+                            onClick={() => setPrivacyMode(!privacyMode)}
+                            className={`flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-full transition-all border ${
+                                privacyMode 
+                                    ? "bg-amber-100 text-amber-800 border-amber-300 dark:bg-amber-900/60 dark:border-amber-700 dark:text-amber-300 shadow-inner"
+                                    : "bg-white text-slate-600 border-slate-200 hover:bg-slate-50 hover:text-slate-900 dark:bg-slate-950 dark:border-slate-800 dark:text-slate-400 dark:hover:bg-slate-900 dark:hover:text-slate-200"
+                            }`}
+                            title="Hide real student names for recording video tutorials"
+                        >
+                            <span>{privacyMode ? "🔒 Privacy: ON" : "👁️ Privacy: OFF"}</span>
+                        </button>
+                    )}
                     {isEdpuzzleMode ? (
                         <div className="bg-violet-100 dark:bg-violet-900/40 text-violet-700 dark:text-violet-400 px-3 py-1 rounded-full text-sm font-semibold flex items-center gap-1.5">
                             <Zap className="w-4 h-4" />
@@ -1325,7 +1353,7 @@ export default function GradingWorkspace() {
                                         </div>
                                     )}
                                     <div className="flex justify-between items-start mb-1">
-                                        <span className="font-semibold text-slate-900 dark:text-slate-50">{sub.studentProfile?.name?.fullName || "Student Name"}</span>
+                                        <span className="font-semibold text-slate-900 dark:text-slate-50">{getMaskedName(sub, submissions.findIndex(s => s.id === sub.id))}</span>
                                         <div className="flex gap-2">
                                             {(sub.late || sub.assignmentSubmission?.late) && (
                                                 <span className="text-[10px] uppercase tracking-wider font-bold bg-red-100 text-red-700 px-2 py-0.5 rounded-full">Late</span>
@@ -1377,7 +1405,7 @@ export default function GradingWorkspace() {
                             {/* Submission Content Area */}
                             <div className="bg-white dark:bg-slate-950 p-6 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-800">
                                 <h3 className="text-lg font-bold border-b border-slate-100 dark:border-slate-800 pb-3 mb-4 flex justify-between items-center text-slate-900 dark:text-slate-50">
-                                    {selectedSubmission.studentProfile?.name?.fullName}'s Work
+                                    {getMaskedName(selectedSubmission, submissions.findIndex(s => s.id === selectedSubmission.id))}'s Work
                                 </h3>
 
                                 {contentLoading || grading ? (
