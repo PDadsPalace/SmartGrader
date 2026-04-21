@@ -308,7 +308,7 @@ export default function Home() {
               <a href="/terms" className="hover:text-indigo-600 transition-colors">Terms of Service</a>
             </div>
             <div className="text-sm text-slate-400">
-              &copy; {new Date().getFullYear()} Panfili Corp. All rights reserved.
+              &copy; {new Date().getFullYear()} SmartGraider. All rights reserved.
             </div>
           </div>
         </footer>
