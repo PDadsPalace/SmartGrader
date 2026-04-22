@@ -1202,7 +1202,7 @@ export default function GradingWorkspace() {
             <header className="h-16 flex-shrink-0 flex items-center justify-between px-6 bg-white dark:bg-slate-950 border-b border-slate-200 dark:border-slate-800">
                 <div className="flex items-center gap-4">
                     <button
-                        onClick={() => router.push(`/courses/${courseId}`)}
+                        onClick={() => router.push(`/courses/${courseId}#assignment-${assignmentId}`)}
                         className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 dark:bg-slate-800 transition-colors text-slate-600 dark:text-slate-300 group flex-shrink-0"
                     >
                         <ArrowLeft className="w-5 h-5 group-hover:-translate-x-1 transition-transform" />

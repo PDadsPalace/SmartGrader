@@ -480,7 +480,7 @@ export default function CourseAssignments() {
                         ) : (
                             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                                 {filteredAssignments.map((assignment) => (
-                                    <div key={assignment.id} className="bg-white dark:bg-slate-950 rounded-2xl p-6 border border-slate-200 dark:border-slate-800 shadow-sm hover:shadow-md transition-all group flex flex-col h-full">
+                                    <div id={`assignment-${assignment.id}`} key={assignment.id} className="bg-white dark:bg-slate-950 rounded-2xl p-6 border border-slate-200 dark:border-slate-800 shadow-sm hover:shadow-md transition-all group flex flex-col h-full scroll-mt-24">
                                         <div className="flex-1">
                                             <div className="flex justify-between items-start mb-3">
                                                 <div className="flex gap-2 items-center">
