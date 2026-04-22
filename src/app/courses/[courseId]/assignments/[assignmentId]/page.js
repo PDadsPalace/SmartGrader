@@ -27,6 +27,8 @@ export default function GradingWorkspace() {
     const [strictness, setStrictness] = useState(5); // 1 = Easy, 10 = Hard
     const [studentNotes, setStudentNotes] = useState("");
     const [studentGradeFloor, setStudentGradeFloor] = useState("");
+    const [enableGlobalFloor, setEnableGlobalFloor] = useState(false);
+    const [globalFloor, setGlobalFloor] = useState("50");
     const [rubricFile, setRubricFile] = useState(null);
 
     // Active Submission Data
@@ -118,6 +120,12 @@ export default function GradingWorkspace() {
 
             const savedLatePenalty = localStorage.getItem(`latePenalty_${assignmentName}`);
             if (savedLatePenalty) setLatePenalty(savedLatePenalty);
+
+            const savedEnableGlobalFloor = localStorage.getItem(`enableGlobalFloor_${assignmentName}`);
+            if (savedEnableGlobalFloor) setEnableGlobalFloor(savedEnableGlobalFloor === 'true');
+
+            const savedGlobalFloor = localStorage.getItem(`globalFloor_${assignmentName}`);
+            if (savedGlobalFloor) setGlobalFloor(savedGlobalFloor);
             
             const savedPrivacyMode = localStorage.getItem('privacyMode');
             if (savedPrivacyMode) setPrivacyMode(savedPrivacyMode === 'true');
@@ -138,9 +146,11 @@ export default function GradingWorkspace() {
             localStorage.setItem(`missingWorkGrade_${assignmentName}`, missingWorkGrade);
             localStorage.setItem(`applyLatePenalty_${assignmentName}`, applyLatePenalty);
             localStorage.setItem(`latePenalty_${assignmentName}`, latePenalty);
+            localStorage.setItem(`enableGlobalFloor_${assignmentName}`, enableGlobalFloor);
+            localStorage.setItem(`globalFloor_${assignmentName}`, globalFloor);
         }
         localStorage.setItem('privacyMode', privacyMode);
-    }, [rubric, strictness, rubricFile, bypassMissingWork, missingWorkGrade, applyLatePenalty, latePenalty, assignmentName, privacyMode]);
+    }, [rubric, strictness, rubricFile, bypassMissingWork, missingWorkGrade, applyLatePenalty, latePenalty, enableGlobalFloor, globalFloor, assignmentName, privacyMode]);
 
     // Save batchResults when they change
     useEffect(() => {
@@ -450,9 +460,18 @@ export default function GradingWorkspace() {
                  
                  // Clamp Floor logic
                  const floorVal = parseFloat(studentGradeFloor);
-                 const returnedVal = parseFloat(finalNativeGrade);
+                 let returnedVal = parseFloat(finalNativeGrade);
                  if (!isNaN(floorVal) && !isNaN(returnedVal) && returnedVal < floorVal) {
                      finalNativeGrade = floorVal.toString();
+                     returnedVal = parseFloat(finalNativeGrade);
+                 }
+
+                 // Global Floor logic
+                 if (enableGlobalFloor && globalFloor) {
+                     const globalVal = parseFloat(globalFloor);
+                     if (!isNaN(globalVal) && !isNaN(returnedVal) && returnedVal < globalVal) {
+                         finalNativeGrade = globalVal.toString();
+                     }
                  }
                  
                  setAiFeedback({ grade: finalNativeGrade, feedback });
@@ -547,9 +566,18 @@ export default function GradingWorkspace() {
 
             // Clamp Grade Floor
             const floorVal = parseFloat(studentGradeFloor);
-            const returnedVal = parseFloat(finalGradeCalculated);
+            let returnedVal = parseFloat(finalGradeCalculated);
             if (!isNaN(floorVal) && !isNaN(returnedVal) && returnedVal < floorVal) {
                 finalGradeCalculated = floorVal.toString();
+                returnedVal = parseFloat(finalGradeCalculated);
+            }
+
+            // Clamp Global Grade Floor
+            if (enableGlobalFloor && globalFloor) {
+                const globalVal = parseFloat(globalFloor);
+                if (!isNaN(globalVal) && !isNaN(returnedVal) && returnedVal < globalVal) {
+                    finalGradeCalculated = globalVal.toString();
+                }
             }
 
             setAiFeedback({
@@ -925,11 +953,20 @@ export default function GradingWorkspace() {
                          
                          // Clamp Floor logic
                          const sFloor = localStorage.getItem(`student_floor_${sub.userId}`);
+                         let returnedVal = parseFloat(finalNativeGrade);
                          if (sFloor) {
                              const floorVal = parseFloat(sFloor);
-                             const returnedVal = parseFloat(finalNativeGrade);
                              if (!isNaN(floorVal) && !isNaN(returnedVal) && returnedVal < floorVal) {
                                  finalNativeGrade = floorVal.toString();
+                                 returnedVal = parseFloat(finalNativeGrade);
+                             }
+                         }
+
+                         // Global Floor logic
+                         if (enableGlobalFloor && globalFloor) {
+                             const globalVal = parseFloat(globalFloor);
+                             if (!isNaN(globalVal) && !isNaN(returnedVal) && returnedVal < globalVal) {
+                                 finalNativeGrade = globalVal.toString();
                              }
                          }
                          
@@ -1029,11 +1066,20 @@ export default function GradingWorkspace() {
 
                         // Clamp Grade Floor for Batch Process
                         const sFloor = localStorage.getItem(`student_floor_${sub.userId}`);
+                        let returnedVal = parseFloat(finalGradeCalculated);
                         if (sFloor) {
                             const floorVal = parseFloat(sFloor);
-                            const returnedVal = parseFloat(finalGradeCalculated);
                             if (!isNaN(floorVal) && !isNaN(returnedVal) && returnedVal < floorVal) {
                                 finalGradeCalculated = floorVal.toString();
+                                returnedVal = parseFloat(finalGradeCalculated);
+                            }
+                        }
+
+                        // Clamp Global Grade Floor for Batch Process
+                        if (enableGlobalFloor && globalFloor) {
+                            const globalVal = parseFloat(globalFloor);
+                            if (!isNaN(globalVal) && !isNaN(returnedVal) && returnedVal < globalVal) {
+                                finalGradeCalculated = globalVal.toString();
                             }
                         }
 
@@ -1164,7 +1210,7 @@ export default function GradingWorkspace() {
                     <div className="min-w-0 pr-4">
                         <h2 className="text-[10px] font-black uppercase tracking-widest text-indigo-500 dark:text-indigo-400 mb-0.5">{courseName || "Loading Course..."}</h2>
                         <h1 className="text-lg font-bold text-slate-900 dark:text-slate-50 leading-tight truncate">
-                            {assignmentName || "Grading Workspace"} <span className="text-xs text-indigo-500 ml-2 bg-indigo-50 px-2 py-1 rounded">v3.89</span>
+                            {assignmentName || "Grading Workspace"} <span className="text-xs text-indigo-500 ml-2 bg-indigo-50 px-2 py-1 rounded">v3.90</span>
                         </h1>
                     </div>
                 </div>
@@ -1217,9 +1263,9 @@ export default function GradingWorkspace() {
                                 <option value="Graded">Graded Only</option>
                             </select>
                         </div>
-                        <div className="flex items-center gap-2 w-full justify-end">
+                        <div className="flex flex-wrap items-center gap-2 w-full justify-end">
                             {Object.keys(batchResults).length > 0 && (
-                                <div className="text-xs font-black px-3 py-1.5 rounded-lg bg-indigo-50 dark:bg-indigo-900/40 border border-indigo-200 text-indigo-700 dark:text-indigo-400 mr-2 flex items-center gap-1.5 shadow-sm">
+                                <div className="text-xs font-black px-3 py-2 rounded-lg bg-indigo-50 dark:bg-indigo-900/40 border border-indigo-200 text-indigo-700 dark:text-indigo-400 flex items-center gap-1.5 shadow-sm h-8 whitespace-nowrap">
                                     <span className="opacity-70 font-semibold tracking-wider">AVG:</span>
                                     <span className="text-sm">
                                         {Math.round(Object.values(batchResults).reduce((sum, result) => {
@@ -1238,9 +1284,9 @@ export default function GradingWorkspace() {
                                             setAiFeedback(null);
                                         }
                                     }}
-                                    className="text-xs bg-red-100 dark:bg-red-900/60 text-red-700 dark:text-red-400 hover:bg-red-200 px-3 py-1.5 rounded-lg font-bold flex items-center gap-1.5 transition-colors mr-2"
+                                    className="text-xs bg-red-100 dark:bg-red-900/60 text-red-700 dark:text-red-400 hover:bg-red-200 px-3 py-2 rounded-lg font-bold flex items-center gap-1.5 transition-colors h-8 whitespace-nowrap"
                                 >
-                                    <X className="w-3.5 h-3.5" /> Clear All
+                                    <X className="w-3.5 h-3.5" /> Clear All Grades
                                 </button>
                             )}
                             {rosterMap && (
@@ -1251,30 +1297,31 @@ export default function GradingWorkspace() {
                                             localStorage.removeItem(`roster_map_${courseId}`);
                                         }
                                     }}
-                                    className="text-xs bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700 px-3 py-1.5 rounded-lg font-bold flex items-center gap-1.5 transition-colors mr-2"
+                                    className="text-xs bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700 px-3 py-2 rounded-lg font-bold flex items-center gap-1.5 transition-colors h-8 whitespace-nowrap"
                                     title="Clear saved PowerSchool Roster"
                                 >
-                                    <X className="w-3.5 h-3.5" /> Reset PS Roster
+                                    <X className="w-3.5 h-3.5" /> Reset Gradebook Roster
                                 </button>
                             )}
                             {submissions.length > 0 && Object.keys(batchResults).length > 0 && (
                                 <button
                                     onClick={handleExportCSV}
-                                    className="text-xs bg-emerald-100 dark:bg-emerald-900/60 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-200 px-3 py-1.5 rounded-lg font-bold flex items-center gap-1.5 transition-colors mr-2"
+                                    className="text-xs bg-emerald-100 dark:bg-emerald-900/60 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-200 px-3 py-2 rounded-lg font-bold flex items-center gap-1.5 transition-colors h-8 whitespace-nowrap"
                                 >
-                                    <Download className="w-3.5 h-3.5" /> Export CSV
+                                    <Download className="w-3.5 h-3.5" /> Export to Gradebook
                                 </button>
                             )}
                             {submissions.length > 0 && Object.keys(batchResults).length > 0 && (
                                 <button
                                     onClick={handleSyncToClassroom}
                                     disabled={loading || isSyncing}
-                                    className="text-xs bg-blue-100 text-blue-700 hover:bg-blue-200 px-3 py-1.5 rounded-lg font-bold flex items-center gap-1.5 transition-colors disabled:opacity-50"
+                                    className="text-xs bg-blue-100 text-blue-700 hover:bg-blue-200 px-3 py-2 rounded-lg font-bold flex items-center gap-1.5 transition-colors disabled:opacity-50 h-8 whitespace-nowrap cursor-pointer"
+                                    style={{ padding: '0.5rem 0.75rem' }}
                                 >
                                     {isSyncing ? (
                                         <><RefreshCw className="w-3.5 h-3.5 animate-spin" /> Syncing {syncProgress.current}/{syncProgress.total}</>
                                     ) : (
-                                        <><RefreshCw className="w-3.5 h-3.5" /> Sync to Google</>
+                                        <><RefreshCw className="w-3.5 h-3.5" /> Sync to Classroom</>
                                     )}
                                 </button>
                             )}
@@ -1639,6 +1686,27 @@ export default function GradingWorkspace() {
                                                             onChange={(e) => setLatePenalty(e.target.value)}
                                                             className="w-14 p-1 text-center text-sm font-bold border border-red-200 dark:border-red-800 rounded-md focus:ring-2 focus:ring-red-500 outline-none bg-white dark:bg-slate-900 text-red-900 dark:text-red-100"
                                                             placeholder="10"
+                                                        />
+                                                    )}
+                                                </div>
+
+                                                <div className="flex gap-1.5">
+                                                    <label className={`flex items-center gap-2 text-xs font-bold cursor-pointer px-3 py-1.5 rounded-lg border transition-colors ${enableGlobalFloor ? 'bg-emerald-100 border-emerald-300 text-emerald-800 dark:bg-emerald-900/60 dark:border-emerald-700 dark:text-emerald-300' : 'bg-slate-50 border-slate-200 text-slate-600 dark:bg-slate-900/40 dark:border-slate-800 dark:text-slate-400 hover:bg-slate-100'}`}>
+                                                        <input
+                                                            type="checkbox"
+                                                            checked={enableGlobalFloor}
+                                                            onChange={(e) => setEnableGlobalFloor(e.target.checked)}
+                                                            className="w-3.5 h-3.5 text-emerald-600 rounded"
+                                                        />
+                                                        Global Floor
+                                                    </label>
+                                                    {enableGlobalFloor && (
+                                                        <input
+                                                            type="number"
+                                                            value={globalFloor}
+                                                            onChange={(e) => setGlobalFloor(e.target.value)}
+                                                            className="w-14 p-1 text-center text-sm font-bold border border-emerald-200 dark:border-emerald-800 rounded-md focus:ring-2 focus:ring-emerald-500 outline-none bg-white dark:bg-slate-900 text-emerald-900 dark:text-emerald-100"
+                                                            placeholder="50"
                                                         />
                                                     )}
                                                 </div>
