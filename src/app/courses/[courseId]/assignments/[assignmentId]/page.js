@@ -425,9 +425,12 @@ export default function GradingWorkspace() {
                 if (!bypassMissingWork) {
                     // Clamp Grade Floor for mockGrade
                     const floorVal = parseFloat(studentGradeFloor);
-                    const returnedVal = parseFloat(mockGrade);
-                    if (!isNaN(floorVal) && !isNaN(returnedVal) && returnedVal < floorVal) {
-                        mockGrade = floorVal.toString();
+                    let returnedVal = parseFloat(mockGrade);
+                    if (!isNaN(floorVal)) {
+                        if (!isNaN(returnedVal) && returnedVal < floorVal) mockGrade = floorVal.toString();
+                    } else if (enableGlobalFloor && globalFloor) {
+                        const globalVal = parseFloat(globalFloor);
+                        if (!isNaN(globalVal) && !isNaN(returnedVal) && returnedVal < globalVal) mockGrade = globalVal.toString();
                     }
                 }
 
@@ -461,16 +464,16 @@ export default function GradingWorkspace() {
                  // Clamp Floor logic
                  const floorVal = parseFloat(studentGradeFloor);
                  let returnedVal = parseFloat(finalNativeGrade);
-                 if (!isNaN(floorVal) && !isNaN(returnedVal) && returnedVal < floorVal) {
-                     finalNativeGrade = floorVal.toString();
-                     returnedVal = parseFloat(finalNativeGrade);
-                 }
-
-                 // Global Floor logic
-                 if (enableGlobalFloor && globalFloor) {
+                 if (!isNaN(floorVal)) {
+                     if (!isNaN(returnedVal) && returnedVal < floorVal) {
+                         finalNativeGrade = floorVal.toString();
+                         returnedVal = parseFloat(finalNativeGrade);
+                     }
+                 } else if (enableGlobalFloor && globalFloor) {
                      const globalVal = parseFloat(globalFloor);
                      if (!isNaN(globalVal) && !isNaN(returnedVal) && returnedVal < globalVal) {
                          finalNativeGrade = globalVal.toString();
+                         returnedVal = parseFloat(finalNativeGrade);
                      }
                  }
                  
@@ -567,16 +570,16 @@ export default function GradingWorkspace() {
             // Clamp Grade Floor
             const floorVal = parseFloat(studentGradeFloor);
             let returnedVal = parseFloat(finalGradeCalculated);
-            if (!isNaN(floorVal) && !isNaN(returnedVal) && returnedVal < floorVal) {
-                finalGradeCalculated = floorVal.toString();
-                returnedVal = parseFloat(finalGradeCalculated);
-            }
-
-            // Clamp Global Grade Floor
-            if (enableGlobalFloor && globalFloor) {
+            if (!isNaN(floorVal)) {
+                if (!isNaN(returnedVal) && returnedVal < floorVal) {
+                    finalGradeCalculated = floorVal.toString();
+                    returnedVal = parseFloat(finalGradeCalculated);
+                }
+            } else if (enableGlobalFloor && globalFloor) {
                 const globalVal = parseFloat(globalFloor);
                 if (!isNaN(globalVal) && !isNaN(returnedVal) && returnedVal < globalVal) {
                     finalGradeCalculated = globalVal.toString();
+                    returnedVal = parseFloat(finalGradeCalculated);
                 }
             }
 
@@ -919,11 +922,14 @@ export default function GradingWorkspace() {
                             mockGrade = (isFloorZero || /\b0\b/.test(sNotes) || /\bzero\b/i.test(sNotes)) ? "0" : "50"; 
                         }
 
-                        if (!bypassMissingWork && sFloor) {
+                        if (!bypassMissingWork) {
                             const floorVal = parseFloat(sFloor);
-                            const returnedVal = parseFloat(mockGrade);
-                            if (!isNaN(floorVal) && !isNaN(returnedVal) && returnedVal < floorVal) {
-                                mockGrade = floorVal.toString();
+                            let returnedVal = parseFloat(mockGrade);
+                            if (!isNaN(floorVal)) {
+                                if (!isNaN(returnedVal) && returnedVal < floorVal) mockGrade = floorVal.toString();
+                            } else if (enableGlobalFloor && globalFloor) {
+                                const globalVal = parseFloat(globalFloor);
+                                if (!isNaN(globalVal) && !isNaN(returnedVal) && returnedVal < globalVal) mockGrade = globalVal.toString();
                             }
                         }
 
@@ -954,19 +960,17 @@ export default function GradingWorkspace() {
                          // Clamp Floor logic
                          const sFloor = localStorage.getItem(`student_floor_${sub.userId}`);
                          let returnedVal = parseFloat(finalNativeGrade);
-                         if (sFloor) {
-                             const floorVal = parseFloat(sFloor);
-                             if (!isNaN(floorVal) && !isNaN(returnedVal) && returnedVal < floorVal) {
+                         const floorVal = parseFloat(sFloor);
+                         if (!isNaN(floorVal)) {
+                             if (!isNaN(returnedVal) && returnedVal < floorVal) {
                                  finalNativeGrade = floorVal.toString();
                                  returnedVal = parseFloat(finalNativeGrade);
                              }
-                         }
-
-                         // Global Floor logic
-                         if (enableGlobalFloor && globalFloor) {
+                         } else if (enableGlobalFloor && globalFloor) {
                              const globalVal = parseFloat(globalFloor);
                              if (!isNaN(globalVal) && !isNaN(returnedVal) && returnedVal < globalVal) {
                                  finalNativeGrade = globalVal.toString();
+                                 returnedVal = parseFloat(finalNativeGrade);
                              }
                          }
                          
@@ -1067,19 +1071,17 @@ export default function GradingWorkspace() {
                         // Clamp Grade Floor for Batch Process
                         const sFloor = localStorage.getItem(`student_floor_${sub.userId}`);
                         let returnedVal = parseFloat(finalGradeCalculated);
-                        if (sFloor) {
-                            const floorVal = parseFloat(sFloor);
-                            if (!isNaN(floorVal) && !isNaN(returnedVal) && returnedVal < floorVal) {
+                        const floorVal = parseFloat(sFloor);
+                        if (!isNaN(floorVal)) {
+                            if (!isNaN(returnedVal) && returnedVal < floorVal) {
                                 finalGradeCalculated = floorVal.toString();
                                 returnedVal = parseFloat(finalGradeCalculated);
                             }
-                        }
-
-                        // Clamp Global Grade Floor for Batch Process
-                        if (enableGlobalFloor && globalFloor) {
+                        } else if (enableGlobalFloor && globalFloor) {
                             const globalVal = parseFloat(globalFloor);
                             if (!isNaN(globalVal) && !isNaN(returnedVal) && returnedVal < globalVal) {
                                 finalGradeCalculated = globalVal.toString();
+                                returnedVal = parseFloat(finalGradeCalculated);
                             }
                         }
 
@@ -1210,7 +1212,7 @@ export default function GradingWorkspace() {
                     <div className="min-w-0 pr-4">
                         <h2 className="text-[10px] font-black uppercase tracking-widest text-indigo-500 dark:text-indigo-400 mb-0.5">{courseName || "Loading Course..."}</h2>
                         <h1 className="text-lg font-bold text-slate-900 dark:text-slate-50 leading-tight truncate">
-                            {assignmentName || "Grading Workspace"} <span className="text-xs text-indigo-500 ml-2 bg-indigo-50 px-2 py-1 rounded">v3.91</span>
+                            {assignmentName || "Grading Workspace"} <span className="text-xs text-indigo-500 ml-2 bg-indigo-50 px-2 py-1 rounded">v3.92</span>
                         </h1>
                     </div>
                 </div>

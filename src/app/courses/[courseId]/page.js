@@ -357,6 +357,21 @@ export default function CourseAssignments() {
         }
     }, [session, courseId]);
 
+    // Auto-scroll to assignment if navigating back
+    useEffect(() => {
+        if (assignments.length > 0) {
+            const hash = window.location.hash;
+            if (hash) {
+                setTimeout(() => {
+                    const el = document.querySelector(hash);
+                    if (el) {
+                        el.scrollIntoView({ behavior: 'smooth' });
+                    }
+                }, 100); // slight delay to ensure DOM has painted the list
+            }
+        }
+    }, [assignments, filterMode]);
+
     useEffect(() => {
         if (isCreateModalOpen) {
             const savedStr = localStorage.getItem("smartgraider_class_schedules");
