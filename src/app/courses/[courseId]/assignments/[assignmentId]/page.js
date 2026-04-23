@@ -396,10 +396,13 @@ export default function GradingWorkspace() {
                 submissionTextOnly.startsWith("No responses found")
             );
 
+            const isUnmatchedForm = submissionTextOnly && submissionTextOnly.startsWith("Unmatched Form:");
+
             const isTextEmpty = !submissionTextOnly ||
                 submissionTextOnly === "Empty document or non-text attachment." ||
                 submissionTextOnly.includes("No attachments found") ||
                 submissionTextOnly.includes("none of them are Google Drive files") ||
+                isUnmatchedForm ||
                 submissionTextOnly.trim().length === 0;
 
             if (isFormError) {
@@ -419,7 +422,7 @@ export default function GradingWorkspace() {
                 if (bypassMissingWork) {
                     mockGrade = missingWorkGrade || "0";
                 } else {
-                    mockGrade = /\b0\b/.test(studentNotes) || /\bzero\b/i.test(studentNotes) ? "0" : "0"; // Changed default empty document grade to 0
+                    mockGrade = /\b0\b/.test(studentNotes) || /\bzero\b/i.test(studentNotes) ? "0" : "50";
                 }
 
                 if (!bypassMissingWork) {
@@ -885,18 +888,9 @@ export default function GradingWorkspace() {
                         submissionTextForAI.startsWith("No Supported Attachments Found") ||
                         submissionTextForAI.startsWith("No responses found") ||
                         isMissingFormError ||
+                        isUnmatchedForm ||
                         submissionTextForAI.trim().length === 0 ||
                         isBlankBinary;
-
-                    if (isUnmatchedForm) {
-                        const resultObj = { grade: "Unmatched", feedback: submissionTextForAI };
-                        setBatchResults(prev => ({ ...prev, [sub.id]: resultObj }));
-
-                        if (selectedSubmission && selectedSubmission.id === sub.id) {
-                            setAiFeedback(resultObj);
-                        }
-                        return; // Skip the API call for this student
-                    }
 
                     if (isFormError) {
                         const resultObj = { grade: "Error", feedback: submissionTextForAI };
