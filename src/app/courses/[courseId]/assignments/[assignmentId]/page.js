@@ -57,9 +57,11 @@ export default function GradingWorkspace() {
     const masterKeyCacheRef = useRef({}); // { [keyStudentId]: { runtimeRubric, runtimeRubricFile } }
     const [similarityFlags, setSimilarityFlags] = useState({}); // { [subId]: [{ matchId, matchName, score }] }
 
-    // Pairwise Plagiarism & String Similarity Engine
+    // Pairwise Plagiarism & String/Image Similarity Engine
     const runSimilarityCheck = (subList = submissions) => {
         const textMap = {};
+        const imageMap = {};
+
         subList.forEach(sub => {
             const cached = submissionCacheRef.current[sub.id];
             if (cached) {
@@ -67,35 +69,76 @@ export default function GradingWorkspace() {
                 if (text && text.length > 50 && !text.startsWith("Empty document") && !text.startsWith("See attached") && !text.includes("Google Form Responses for:")) {
                     textMap[sub.id] = text.trim();
                 }
+
+                // Collect image/binary fingerprints for screenshot duplication check
+                const binaries = cached.multipleBinaries || [];
+                if (binaries.length > 0) {
+                    const fingerprints = binaries.map(b => {
+                        const raw = b.data ? (b.data.split(",")[1] || b.data) : "";
+                        if (raw.length > 100) {
+                            return `${raw.length}_${raw.substring(0, 150)}_${raw.substring(Math.floor(raw.length / 2), Math.floor(raw.length / 2) + 150)}_${raw.substring(raw.length - 150)}`;
+                        }
+                        return raw;
+                    }).filter(fp => fp.length > 0);
+
+                    if (fingerprints.length > 0) {
+                        imageMap[sub.id] = fingerprints;
+                    }
+                }
             }
         });
 
-        const subIds = Object.keys(textMap);
-        if (subIds.length < 2) return;
-
         const newFlags = {};
 
-        for (let i = 0; i < subIds.length; i++) {
-            const idA = subIds[i];
-            const textA = textMap[idA];
-            const subA = subList.find(s => s.id === idA);
+        for (let i = 0; i < subList.length; i++) {
+            const subA = subList[i];
+            const idA = subA.id;
             const nameA = subA?.studentProfile?.name?.fullName || "Student";
+            const textA = textMap[idA];
+            const imagesA = imageMap[idA];
 
-            for (let j = i + 1; j < subIds.length; j++) {
-                const idB = subIds[j];
-                const textB = textMap[idB];
-                const subB = subList.find(s => s.id === idB);
+            for (let j = i + 1; j < subList.length; j++) {
+                const subB = subList[j];
+                const idB = subB.id;
                 const nameB = subB?.studentProfile?.name?.fullName || "Student";
+                const textB = textMap[idB];
+                const imagesB = imageMap[idB];
 
-                const similarity = stringSimilarity.compareTwoStrings(textA, textB);
-                const matchPct = Math.round(similarity * 100);
+                // 1. Text Similarity Check
+                if (textA && textB) {
+                    const similarity = stringSimilarity.compareTwoStrings(textA, textB);
+                    const matchPct = Math.round(similarity * 100);
 
-                if (matchPct >= 85) {
-                    if (!newFlags[idA]) newFlags[idA] = [];
-                    if (!newFlags[idB]) newFlags[idB] = [];
+                    if (matchPct >= 85) {
+                        if (!newFlags[idA]) newFlags[idA] = [];
+                        if (!newFlags[idB]) newFlags[idB] = [];
 
-                    newFlags[idA].push({ matchId: idB, matchName: nameB, score: matchPct });
-                    newFlags[idB].push({ matchId: idA, matchName: nameA, score: matchPct });
+                        newFlags[idA].push({ matchId: idB, matchName: nameB, score: matchPct, type: 'text' });
+                        newFlags[idB].push({ matchId: idA, matchName: nameA, score: matchPct, type: 'text' });
+                    }
+                }
+
+                // 2. Exact Screenshot / Image Match Check
+                if (imagesA && imagesB) {
+                    let imageMatched = false;
+                    for (const imgA of imagesA) {
+                        if (imagesB.includes(imgA)) {
+                            imageMatched = true;
+                            break;
+                        }
+                    }
+
+                    if (imageMatched) {
+                        if (!newFlags[idA]) newFlags[idA] = [];
+                        if (!newFlags[idB]) newFlags[idB] = [];
+
+                        if (!newFlags[idA].some(m => m.matchId === idB && m.type === 'image')) {
+                            newFlags[idA].push({ matchId: idB, matchName: nameB, score: 100, type: 'image' });
+                        }
+                        if (!newFlags[idB].some(m => m.matchId === idA && m.type === 'image')) {
+                            newFlags[idB].push({ matchId: idA, matchName: nameA, score: 100, type: 'image' });
+                        }
+                    }
                 }
             }
         }
@@ -1363,7 +1406,7 @@ export default function GradingWorkspace() {
                     <div className="min-w-0 pr-4">
                         <h2 className="text-[10px] font-black uppercase tracking-widest text-indigo-500 dark:text-indigo-400 mb-0.5">{courseName || "Loading Course..."}</h2>
                         <h1 className="text-lg font-bold text-slate-900 dark:text-slate-50 leading-tight truncate">
-                            {assignmentName || "Grading Workspace"} <span className="text-xs text-indigo-500 ml-2 bg-indigo-50 px-2 py-1 rounded">v3.93</span>
+                            {assignmentName || "Grading Workspace"} <span className="text-xs text-indigo-500 ml-2 bg-indigo-50 px-2 py-1 rounded">v3.94</span>
                         </h1>
                     </div>
                 </div>
@@ -1573,8 +1616,15 @@ export default function GradingWorkspace() {
                                         <span className="font-semibold text-slate-900 dark:text-slate-50">{getMaskedName(sub, submissions.findIndex(s => s.id === sub.id))}</span>
                                         <div className="flex gap-2 flex-wrap justify-end">
                                             {similarityFlags[sub.id] && similarityFlags[sub.id].length > 0 && (
-                                                <span className="text-[10px] font-bold bg-amber-100 dark:bg-amber-900/60 text-amber-800 dark:text-amber-300 px-2 py-0.5 rounded-full flex items-center gap-1 border border-amber-300 dark:border-amber-700" title={`High similarity with ${similarityFlags[sub.id].map(m => m.matchName + ' (' + m.score + '%)').join(', ')}`}>
-                                                    ⚠️ {similarityFlags[sub.id][0].score}% Match
+                                                <span
+                                                    className={`text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1 border ${
+                                                        similarityFlags[sub.id].some(m => m.type === 'image')
+                                                            ? 'bg-purple-100 dark:bg-purple-900/60 text-purple-800 dark:text-purple-300 border-purple-300 dark:border-purple-700'
+                                                            : 'bg-amber-100 dark:bg-amber-900/60 text-amber-800 dark:text-amber-300 border-amber-300 dark:border-amber-700'
+                                                    }`}
+                                                    title={`High similarity with ${similarityFlags[sub.id].map(m => m.matchName + ' (' + m.score + '% ' + (m.type === 'image' ? 'Image' : 'Text') + ')').join(', ')}`}
+                                                >
+                                                    {similarityFlags[sub.id].some(m => m.type === 'image') ? '🖼️ 100% Image Match' : `⚠️ ${similarityFlags[sub.id][0].score}% Match`}
                                                 </span>
                                             )}
                                             {(sub.late || sub.assignmentSubmission?.late) && (
