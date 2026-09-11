@@ -43,13 +43,65 @@ export default function GradingWorkspace() {
     const [grading, setGrading] = useState(false);
     const [error, setError] = useState(null);
     const [aiFeedback, setAiFeedback] = useState(null);
-    const [generateFeedback, setGenerateFeedback] = useState(true);
+    const [generateFeedback, setGenerateFeedback] = useState(false);
+    const [pastExemplars, setPastExemplars] = useState([]);
 
     // Batch Grading
     const [batchGrading, setBatchGrading] = useState(false);
     const [batchProgress, setBatchProgress] = useState({ current: 0, total: 0 });
     const [batchResults, setBatchResults] = useState({}); // { [submissionId]: { grade, feedback } }
     const stopGradingRef = useRef(false);
+
+    // Speed & Intelligence Caching & Similarity
+    const submissionCacheRef = useRef({}); // { [submissionId]: docData }
+    const masterKeyCacheRef = useRef({}); // { [keyStudentId]: { runtimeRubric, runtimeRubricFile } }
+    const [similarityFlags, setSimilarityFlags] = useState({}); // { [subId]: [{ matchId, matchName, score }] }
+
+    // Pairwise Plagiarism & String Similarity Engine
+    const runSimilarityCheck = (subList = submissions) => {
+        const textMap = {};
+        subList.forEach(sub => {
+            const cached = submissionCacheRef.current[sub.id];
+            if (cached) {
+                let text = cached.data || cached.content || "";
+                if (text && text.length > 50 && !text.startsWith("Empty document") && !text.startsWith("See attached") && !text.includes("Google Form Responses for:")) {
+                    textMap[sub.id] = text.trim();
+                }
+            }
+        });
+
+        const subIds = Object.keys(textMap);
+        if (subIds.length < 2) return;
+
+        const newFlags = {};
+
+        for (let i = 0; i < subIds.length; i++) {
+            const idA = subIds[i];
+            const textA = textMap[idA];
+            const subA = subList.find(s => s.id === idA);
+            const nameA = subA?.studentProfile?.name?.fullName || "Student";
+
+            for (let j = i + 1; j < subIds.length; j++) {
+                const idB = subIds[j];
+                const textB = textMap[idB];
+                const subB = subList.find(s => s.id === idB);
+                const nameB = subB?.studentProfile?.name?.fullName || "Student";
+
+                const similarity = stringSimilarity.compareTwoStrings(textA, textB);
+                const matchPct = Math.round(similarity * 100);
+
+                if (matchPct >= 85) {
+                    if (!newFlags[idA]) newFlags[idA] = [];
+                    if (!newFlags[idB]) newFlags[idB] = [];
+
+                    newFlags[idA].push({ matchId: idB, matchName: nameB, score: matchPct });
+                    newFlags[idB].push({ matchId: idA, matchName: nameA, score: matchPct });
+                }
+            }
+        }
+
+        setSimilarityFlags(newFlags);
+    };
 
     // Sync to Classroom
     const [isSyncing, setIsSyncing] = useState(false);
@@ -129,10 +181,22 @@ export default function GradingWorkspace() {
             
             const savedPrivacyMode = localStorage.getItem('privacyMode');
             if (savedPrivacyMode) setPrivacyMode(savedPrivacyMode === 'true');
+
+            const savedGenFeedback = localStorage.getItem('pref_generateFeedback');
+            if (savedGenFeedback !== null) setGenerateFeedback(savedGenFeedback === 'true');
+
+            // Load teacher grading exemplars for this assignment title across classes
+            const exemplarKey = `exemplars_${assignmentName.toLowerCase().trim()}`;
+            try {
+                const savedEx = localStorage.getItem(exemplarKey);
+                if (savedEx) setPastExemplars(JSON.parse(savedEx));
+            } catch (e) {
+                console.error("Failed to parse past exemplars", e);
+            }
         }
     }, [assignmentName]);
 
-    // Save rubric/strictness/file when they change
+    // Save rubric/strictness/file/feedback settings when they change
     useEffect(() => {
         if (assignmentName) {
             if (rubric !== "") {
@@ -150,7 +214,8 @@ export default function GradingWorkspace() {
             localStorage.setItem(`globalFloor_${assignmentName}`, globalFloor);
         }
         localStorage.setItem('privacyMode', privacyMode);
-    }, [rubric, strictness, rubricFile, bypassMissingWork, missingWorkGrade, applyLatePenalty, latePenalty, enableGlobalFloor, globalFloor, assignmentName, privacyMode]);
+        localStorage.setItem('pref_generateFeedback', String(generateFeedback));
+    }, [rubric, strictness, rubricFile, bypassMissingWork, missingWorkGrade, applyLatePenalty, latePenalty, enableGlobalFloor, globalFloor, assignmentName, privacyMode, generateFeedback]);
 
     // Save batchResults when they change
     useEffect(() => {
@@ -247,13 +312,76 @@ export default function GradingWorkspace() {
                 if (mat.driveFile?.driveFile?.alternateLink?.includes("edpuzzle.com")) return true;
             }
         }
-        // 3. On the grading page: most submissions have assignedGrade but no drive attachments
+        // 3. On the grading page: most submissions have assignedGrade or draftGrade but no drive attachments
         if (subs && subs.length > 0) {
-            const withGrade = subs.filter(s => s.assignedGrade != null).length;
+            const withGrade = subs.filter(s => s.assignedGrade != null || s.draftGrade != null).length;
             const withAttachments = subs.filter(s => s.assignmentSubmission?.attachments?.length > 0).length;
             if (withGrade >= Math.ceil(subs.length / 2) && withAttachments === 0) return true;
         }
         return false;
+    };
+
+    // Helper to record teacher manual grade adjustment as an exemplar for AI learning
+    const recordExemplar = (subId, newGrade) => {
+        if (!assignmentName || !subId || newGrade === undefined || newGrade === null) return;
+        const sub = submissions.find(s => s.id === subId);
+        if (!sub) return;
+        const cached = submissionCacheRef.current[subId];
+        let textSnippet = "";
+        if (cached) {
+            textSnippet = (cached.data || cached.content || "").substring(0, 400).trim();
+        }
+        if (!textSnippet || textSnippet.startsWith("Empty document")) return;
+
+        const exemplarKey = `exemplars_${assignmentName.toLowerCase().trim()}`;
+        let exemplars = [];
+        try {
+            const saved = localStorage.getItem(exemplarKey);
+            if (saved) exemplars = JSON.parse(saved);
+        } catch (e) {}
+
+        exemplars = exemplars.filter(e => e.studentId !== sub.userId);
+        exemplars.unshift({
+            studentId: sub.userId,
+            textSnippet: textSnippet,
+            grade: String(newGrade),
+            feedback: batchResults[subId]?.feedback || "",
+            timestamp: Date.now()
+        });
+        if (exemplars.length > 8) exemplars = exemplars.slice(0, 8);
+        localStorage.setItem(exemplarKey, JSON.stringify(exemplars));
+        setPastExemplars(exemplars);
+    };
+
+    // EdPuzzle: Import grades directly from Classroom's assignedGrade / draftGrade field
+    const handleImportClassroomGrades = () => {
+        if (submissions.length === 0) return;
+        setImportingGrades(true);
+        const results = {};
+        let count = 0;
+        submissions.forEach(sub => {
+            const effectiveGrade = sub.assignedGrade ?? sub.draftGrade;
+            if (effectiveGrade != null && effectiveGrade !== undefined) {
+                results[sub.id] = {
+                    grade: String(effectiveGrade),
+                    feedback: "Grade imported from Google Classroom (EdPuzzle or external tool). No AI grading was run."
+                };
+                count++;
+            } else {
+                results[sub.id] = {
+                    grade: "0",
+                    feedback: "No grade found in Google Classroom. Student likely did not complete the EdPuzzle activity."
+                };
+            }
+        });
+        setBatchResults(prev => ({ ...prev, ...results }));
+        localStorage.setItem(`grades_${courseId}_${assignmentId}`, JSON.stringify({ ...batchResults, ...results }));
+        setImportedCount(count);
+        // Show the first student's result immediately
+        if (selectedSubmission && results[selectedSubmission.id]) {
+            setAiFeedback(results[selectedSubmission.id]);
+        }
+        setImportingGrades(false);
     };
 
     // Helper to detect Google Forms
@@ -314,11 +442,37 @@ export default function GradingWorkspace() {
         }
     }, [session, courseId, assignmentId]);
 
-    // Fetch the actual Google Doc content when a student is selected
+    // Fetch the actual Google Doc content when a student is selected (checking in-memory cache first)
     useEffect(() => {
         if (session?.accessToken && courseId && assignmentId && selectedSubmission) {
             setContentLoading(true);
             setSubmissionContent("");
+
+            // Check cache first to save API roundtrips
+            if (submissionCacheRef.current[selectedSubmission.id]) {
+                const cached = submissionCacheRef.current[selectedSubmission.id];
+                if (cached.data) {
+                    setSubmissionContent(cached.data);
+                    setSubmissionMime(cached.mimeType);
+                    setSubmissionIsBinary(cached.isBinary);
+                    setMultipleBinaries(cached.multipleBinaries || []);
+                    if (cached.nativeGrade) {
+                        setSelectedSubmission(prev => ({ ...prev, nativeGrade: cached.nativeGrade }));
+                    }
+                    setMixedFormMeta(cached.mixedFormMeta || null);
+                } else {
+                    setSubmissionContent(cached.content || "Empty document or non-text attachment.");
+                    setSubmissionIsBinary(false);
+                    setSubmissionMime("text/plain");
+                    setMultipleBinaries([]);
+                    if (cached.nativeGrade) {
+                        setSelectedSubmission(prev => ({ ...prev, nativeGrade: cached.nativeGrade }));
+                    }
+                    setMixedFormMeta(cached.mixedFormMeta || null);
+                }
+                setContentLoading(false);
+                return;
+            }
 
             fetch(`/api/courses/${courseId}/assignments/${assignmentId}/submissions/${selectedSubmission.id}`)
                 .then((res) => {
@@ -332,6 +486,7 @@ export default function GradingWorkspace() {
                     return res.json();
                 })
                 .then((data) => {
+                    submissionCacheRef.current[selectedSubmission.id] = data; // Cache in memory
                     if (data.data) {
                         setSubmissionContent(data.data);
                         setSubmissionMime(data.mimeType);
@@ -493,23 +648,33 @@ export default function GradingWorkspace() {
             let runtimeRubricFile = rubricFile ? { data: rubricFile.base64.split(",")[1], mimeType: rubricFile.mimeType } : null;
 
             if (useStudentAsKey && keyStudentId) {
-                const keySub = submissions.find(s => s.userId === keyStudentId);
-                if (keySub) {
-                    try {
-                        const keyRes = await fetch(`/api/courses/${courseId}/assignments/${assignmentId}/submissions/${keySub.id}`);
-                        const docData = await keyRes.json();
-                        let keyText = "";
-                        if (docData.data) keyText = docData.data;
-                        else if (docData.content) keyText = docData.content;
-                        if (keyText) {
-                            runtimeRubric = `Use the following student submission as the perfect 100% Answer Key. Every other student must be graded strictly against how well their answers match this master student's answers.\n\nAdditional Instructions from Teacher:\n${rubric}\n\n[MASTER STUDENT TEXT]:\n\n` + keyText;
-                            runtimeRubricFile = null;
-                            if (docData.isBinary && docData.data) {
-                                runtimeRubricFile = { data: docData.data, mimeType: docData.mimeType };
+                if (masterKeyCacheRef.current[keyStudentId]) {
+                    runtimeRubric = masterKeyCacheRef.current[keyStudentId].runtimeRubric;
+                    runtimeRubricFile = masterKeyCacheRef.current[keyStudentId].runtimeRubricFile;
+                } else {
+                    const keySub = submissions.find(s => s.userId === keyStudentId);
+                    if (keySub) {
+                        try {
+                            let docData = submissionCacheRef.current[keySub.id];
+                            if (!docData) {
+                                const keyRes = await fetch(`/api/courses/${courseId}/assignments/${assignmentId}/submissions/${keySub.id}`);
+                                docData = await keyRes.json();
+                                submissionCacheRef.current[keySub.id] = docData;
                             }
+                            let keyText = "";
+                            if (docData.data) keyText = docData.data;
+                            else if (docData.content) keyText = docData.content;
+                            if (keyText) {
+                                runtimeRubric = `Use the following student submission as the perfect 100% Answer Key. Every other student must be graded strictly against how well their answers match this master student's answers.\n\nAdditional Instructions from Teacher:\n${rubric}\n\n[MASTER STUDENT TEXT]:\n\n` + keyText;
+                                runtimeRubricFile = null;
+                                if (docData.isBinary && docData.data) {
+                                    runtimeRubricFile = { data: docData.data, mimeType: docData.mimeType };
+                                }
+                                masterKeyCacheRef.current[keyStudentId] = { runtimeRubric, runtimeRubricFile };
+                            }
+                        } catch (e) {
+                            console.error("Failed to fetch student key", e);
                         }
-                    } catch (e) {
-                        console.error("Failed to fetch student key", e);
                     }
                 }
             }
@@ -527,7 +692,8 @@ export default function GradingWorkspace() {
                     studentFiles: inlineDataFilesForAI,
                     rubricFile: runtimeRubricFile,
                     generateFeedback: generateFeedback,
-                    maxPoints: assignmentInfo?.maxPoints || 100
+                    maxPoints: assignmentInfo?.maxPoints || 100,
+                    pastExemplars: pastExemplars
                 })
             });
 
@@ -588,14 +754,16 @@ export default function GradingWorkspace() {
 
             setAiFeedback({
                 grade: finalGradeCalculated,
-                feedback: data.feedback || "No feedback returned."
+                feedback: data.feedback || "No feedback returned.",
+                confidence: data.confidence || "high"
             });
             setBatchResults(prev => ({
                 ...prev,
                 [selectedSubmission.id]: {
                     ...prev[selectedSubmission.id],
                     grade: finalGradeCalculated,
-                    feedback: data.feedback || "No feedback returned."
+                    feedback: data.feedback || "No feedback returned.",
+                    confidence: data.confidence || "high"
                 }
             }));
         } catch (err) {
@@ -724,36 +892,6 @@ export default function GradingWorkspace() {
         document.body.removeChild(link);
     };
 
-    // EdPuzzle: Import grades directly from Classroom's assignedGrade field
-    const handleImportClassroomGrades = () => {
-        if (submissions.length === 0) return;
-        setImportingGrades(true);
-        const results = {};
-        let count = 0;
-        submissions.forEach(sub => {
-            if (sub.assignedGrade != null && sub.assignedGrade !== undefined) {
-                results[sub.id] = {
-                    grade: String(sub.assignedGrade),
-                    feedback: "Grade imported from Google Classroom (EdPuzzle or external tool). No AI grading was run."
-                };
-                count++;
-            } else {
-                results[sub.id] = {
-                    grade: "0",
-                    feedback: "No grade found in Google Classroom. Student likely did not complete the EdPuzzle activity."
-                };
-            }
-        });
-        setBatchResults(prev => ({ ...prev, ...results }));
-        localStorage.setItem(`grades_${courseId}_${assignmentId}`, JSON.stringify({ ...batchResults, ...results }));
-        setImportedCount(count);
-        // Show the first student's result immediately
-        if (selectedSubmission && results[selectedSubmission.id]) {
-            setAiFeedback(results[selectedSubmission.id]);
-        }
-        setImportingGrades(false);
-    };
-
     const handleRegradeAll = async () => {
         const confirmed = window.confirm(
             "Are you sure you want to regrade this assignment?\n\nThis will completely erase all existing drafted grades and feedback, and generate brand new evaluations for the entire class."
@@ -783,28 +921,38 @@ export default function GradingWorkspace() {
         let baselineRubricFile = rubricFile ? { data: rubricFile.base64.split(",")[1], mimeType: rubricFile.mimeType } : null;
 
         if (useStudentAsKey && keyStudentId) {
-            const keySub = submissions.find(s => s.userId === keyStudentId);
-            if (keySub) {
-                try {
-                    const keyRes = await fetch(`/api/courses/${courseId}/assignments/${assignmentId}/submissions/${keySub.id}`);
-                    const docData = await keyRes.json();
-                    let keyText = "";
-                    if (docData.isBinary) {
-                        keyText = "See attached master student file.";
-                    } else if (docData.data) {
-                        keyText = docData.data;
-                    } else if (docData.content) {
-                        keyText = docData.content;
-                    }
-                    if (keyText) {
-                        baselineRubric = `Use the following student submission as the perfect 100% Answer Key. Every other student must be graded strictly against how well their answers match this master student's answers.\n\nAdditional Instructions from Teacher:\n${rubric}\n\n[MASTER STUDENT TEXT]:\n\n` + keyText;
-                        baselineRubricFile = null;
-                        if (docData.isBinary && docData.data) {
-                            baselineRubricFile = { data: docData.data, mimeType: docData.mimeType };
+            if (masterKeyCacheRef.current[keyStudentId]) {
+                baselineRubric = masterKeyCacheRef.current[keyStudentId].runtimeRubric;
+                baselineRubricFile = masterKeyCacheRef.current[keyStudentId].runtimeRubricFile;
+            } else {
+                const keySub = submissions.find(s => s.userId === keyStudentId);
+                if (keySub) {
+                    try {
+                        let docData = submissionCacheRef.current[keySub.id];
+                        if (!docData) {
+                            const keyRes = await fetch(`/api/courses/${courseId}/assignments/${assignmentId}/submissions/${keySub.id}`);
+                            docData = await keyRes.json();
+                            submissionCacheRef.current[keySub.id] = docData;
                         }
+                        let keyText = "";
+                        if (docData.isBinary) {
+                            keyText = "See attached master student file.";
+                        } else if (docData.data) {
+                            keyText = docData.data;
+                        } else if (docData.content) {
+                            keyText = docData.content;
+                        }
+                        if (keyText) {
+                            baselineRubric = `Use the following student submission as the perfect 100% Answer Key. Every other student must be graded strictly against how well their answers match this master student's answers.\n\nAdditional Instructions from Teacher:\n${rubric}\n\n[MASTER STUDENT TEXT]:\n\n` + keyText;
+                            baselineRubricFile = null;
+                            if (docData.isBinary && docData.data) {
+                                baselineRubricFile = { data: docData.data, mimeType: docData.mimeType };
+                            }
+                            masterKeyCacheRef.current[keyStudentId] = { runtimeRubric: baselineRubric, runtimeRubricFile: baselineRubricFile };
+                        }
+                    } catch (e) {
+                        console.error("Failed to fetch batch student key", e);
                     }
-                } catch (e) {
-                    console.error("Failed to fetch batch student key", e);
                 }
             }
         }
@@ -828,20 +976,24 @@ export default function GradingWorkspace() {
                         return;
                     }
 
-                    // 1. Fetch content
-                    const docRes = await fetch(`/api/courses/${courseId}/assignments/${assignmentId}/submissions/${sub.id}`);
+                    // 1. Fetch content (checking submissionCacheRef first!)
+                    let docData = submissionCacheRef.current[sub.id];
+                    if (!docData) {
+                        const docRes = await fetch(`/api/courses/${courseId}/assignments/${assignmentId}/submissions/${sub.id}`);
 
-                    if (docRes.status === 401) {
-                        throw new Error("Google API token expired. Please log out and log back in to renew your session.");
-                    }
-                    if (docRes.status === 403) {
-                        throw new Error("Google Drive access denied. Please log out and log back in to grant permission.");
-                    }
+                        if (docRes.status === 401) {
+                            throw new Error("Google API token expired. Please log out and log back in to renew your session.");
+                        }
+                        if (docRes.status === 403) {
+                            throw new Error("Google Drive access denied. Please log out and log back in to grant permission.");
+                        }
 
-                    const docData = await docRes.json();
+                        docData = await docRes.json();
 
-                    if (!docRes.ok) {
-                        throw new Error(docData.error || "Failed to load document content.");
+                        if (!docRes.ok) {
+                            throw new Error(docData.error || "Failed to load document content.");
+                        }
+                        submissionCacheRef.current[sub.id] = docData;
                     }
 
                     let submissionTextForAI = "Empty document or non-text attachment.";
@@ -992,7 +1144,8 @@ export default function GradingWorkspace() {
                                 studentFiles: inlineDataFilesForAI,
                                 rubricFile: baselineRubricFile,
                                 generateFeedback: generateFeedback,
-                                maxPoints: assignmentInfo?.maxPoints || 100
+                                maxPoints: assignmentInfo?.maxPoints || 100,
+                                pastExemplars: pastExemplars
                             })
                         });
                         
@@ -1081,7 +1234,8 @@ export default function GradingWorkspace() {
 
                         const resultObj = {
                             grade: finalGradeCalculated,
-                            feedback: gradeData.feedback || "No feedback returned."
+                            feedback: gradeData.feedback || "No feedback returned.",
+                            confidence: gradeData.confidence || "high"
                         };
                         setBatchResults(prev => ({ ...prev, [sub.id]: resultObj }));
 
@@ -1117,6 +1271,9 @@ export default function GradingWorkspace() {
         });
 
         await Promise.all(workers);
+
+        // Run plagiarism & pairwise text similarity analysis across all fetched submissions
+        runSimilarityCheck(submissions);
 
         setBatchGrading(false);
     };
@@ -1206,7 +1363,7 @@ export default function GradingWorkspace() {
                     <div className="min-w-0 pr-4">
                         <h2 className="text-[10px] font-black uppercase tracking-widest text-indigo-500 dark:text-indigo-400 mb-0.5">{courseName || "Loading Course..."}</h2>
                         <h1 className="text-lg font-bold text-slate-900 dark:text-slate-50 leading-tight truncate">
-                            {assignmentName || "Grading Workspace"} <span className="text-xs text-indigo-500 ml-2 bg-indigo-50 px-2 py-1 rounded">v3.92</span>
+                            {assignmentName || "Grading Workspace"} <span className="text-xs text-indigo-500 ml-2 bg-indigo-50 px-2 py-1 rounded">v3.93</span>
                         </h1>
                     </div>
                 </div>
@@ -1358,6 +1515,7 @@ export default function GradingWorkspace() {
                                                     if (selectedSubmission?.id === sub.id) {
                                                         setAiFeedback(prev => prev ? { ...prev, grade: val } : { grade: val, feedback: batchResults[sub.id].feedback });
                                                     }
+                                                    recordExemplar(sub.id, val);
                                                 }}
                                                 className="bg-indigo-500 text-white w-9 h-6 text-center rounded-full shadow-sm border-2 border-white text-[11px] font-bold outline-none focus:ring-2 focus:ring-indigo-300 placeholder-white/70"
                                                 placeholder="--"
@@ -1379,6 +1537,7 @@ export default function GradingWorkspace() {
                                                         if (selectedSubmission?.id === sub.id) {
                                                             setAiFeedback(prev => prev ? { ...prev, grade: updated } : { grade: updated, feedback: batchResults[sub.id].feedback });
                                                         }
+                                                        recordExemplar(sub.id, updated);
                                                     }}
                                                     className="text-[8px] leading-none text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 font-bold p-0.5 hover:bg-slate-100 dark:hover:bg-slate-800 rounded transition-colors block"
                                                     title="Increase Grade"
@@ -1400,6 +1559,7 @@ export default function GradingWorkspace() {
                                                         if (selectedSubmission?.id === sub.id) {
                                                             setAiFeedback(prev => prev ? { ...prev, grade: updated } : { grade: updated, feedback: batchResults[sub.id].feedback });
                                                         }
+                                                        recordExemplar(sub.id, updated);
                                                     }}
                                                     className="text-[8px] leading-none text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 font-bold p-0.5 hover:bg-slate-100 dark:hover:bg-slate-800 rounded transition-colors block"
                                                     title="Decrease Grade"
@@ -1411,7 +1571,12 @@ export default function GradingWorkspace() {
                                     )}
                                     <div className="flex justify-between items-start mb-1">
                                         <span className="font-semibold text-slate-900 dark:text-slate-50">{getMaskedName(sub, submissions.findIndex(s => s.id === sub.id))}</span>
-                                        <div className="flex gap-2">
+                                        <div className="flex gap-2 flex-wrap justify-end">
+                                            {similarityFlags[sub.id] && similarityFlags[sub.id].length > 0 && (
+                                                <span className="text-[10px] font-bold bg-amber-100 dark:bg-amber-900/60 text-amber-800 dark:text-amber-300 px-2 py-0.5 rounded-full flex items-center gap-1 border border-amber-300 dark:border-amber-700" title={`High similarity with ${similarityFlags[sub.id].map(m => m.matchName + ' (' + m.score + '%)').join(', ')}`}>
+                                                    ⚠️ {similarityFlags[sub.id][0].score}% Match
+                                                </span>
+                                            )}
                                             {(sub.late || sub.assignmentSubmission?.late) && (
                                                 <span className="text-[10px] uppercase tracking-wider font-bold bg-red-100 text-red-700 px-2 py-0.5 rounded-full">Late</span>
                                             )}
@@ -1548,10 +1713,17 @@ export default function GradingWorkspace() {
                             {/* AI Grading Controls */}
                             <div className="bg-white dark:bg-slate-950 p-6 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-800 space-y-6">
                                 <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
-                                    <h3 className="text-lg font-bold flex items-center gap-2 text-slate-900 dark:text-slate-50">
-                                        <Settings2 className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
-                                        AI Grading Controls
-                                    </h3>
+                                    <div className="flex items-center gap-3">
+                                        <h3 className="text-lg font-bold flex items-center gap-2 text-slate-900 dark:text-slate-50">
+                                            <Settings2 className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
+                                            AI Grading Controls
+                                        </h3>
+                                        {pastExemplars.length > 0 && (
+                                            <span className="text-xs bg-purple-100 dark:bg-purple-900/60 text-purple-800 dark:text-purple-300 font-bold px-2.5 py-1 rounded-lg border border-purple-300 dark:border-purple-700 flex items-center gap-1.5 shadow-sm" title="The AI will adapt its grading style based on your manual grade edits for this assignment across classes">
+                                                🧠 Smart Learning: {pastExemplars.length} Teacher {pastExemplars.length === 1 ? 'Example' : 'Examples'}
+                                            </span>
+                                        )}
+                                    </div>
                                     <button
                                         onClick={() => {
                                             const next = !isEdpuzzleMode;
@@ -1847,13 +2019,34 @@ export default function GradingWorkspace() {
                                 <div className="bg-indigo-50 dark:bg-indigo-900/40 p-6 rounded-2xl border border-indigo-100 animate-in slide-in-from-bottom-4 duration-300 relative overflow-hidden">
                                     <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-200 rounded-full blur-3xl opacity-30 -mr-10 -mt-10 pointer-events-none"></div>
                                     <div className="flex justify-between items-start mb-4 relative z-10">
-                                        <h3 className="font-bold text-indigo-900 dark:text-indigo-300 border-b border-indigo-200/50 pb-2 w-full flex items-center justify-between gap-2">
+                                        <h3 className="font-bold text-indigo-900 dark:text-indigo-300 border-b border-indigo-200/50 pb-2 w-full flex items-center justify-between gap-2 flex-wrap">
                                             <div className="flex items-center gap-2">
-                                                <CheckCircle2 className="w-5 h-5" />
+                                                <CheckCircle2 className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
                                                 AI Evaluation Result
                                             </div>
+                                            {aiFeedback.confidence === "low" && (
+                                                <span className="text-xs font-bold bg-amber-100 text-amber-900 dark:bg-amber-900/60 dark:text-amber-200 px-2.5 py-1 rounded-full border border-amber-300 dark:border-amber-700 flex items-center gap-1 shadow-sm">
+                                                    🔍 Low AI Confidence (Teacher Review Suggested)
+                                                </span>
+                                            )}
                                         </h3>
                                     </div>
+
+                                    {similarityFlags[selectedSubmission?.id] && similarityFlags[selectedSubmission.id].length > 0 && (
+                                        <div className="mb-4 p-3 bg-amber-100/90 dark:bg-amber-900/60 border border-amber-300 dark:border-amber-700 rounded-xl text-amber-950 dark:text-amber-200 text-xs font-semibold shadow-sm">
+                                            <div className="font-bold flex items-center gap-1.5 text-amber-900 dark:text-amber-100 mb-1">
+                                                <span>⚠️ Plagiarism / High Text Similarity Alert</span>
+                                            </div>
+                                            <p>This submission matches text from other student(s) in the class:</p>
+                                            <ul className="list-disc list-inside mt-1 space-y-0.5">
+                                                {similarityFlags[selectedSubmission.id].map((match, idx) => (
+                                                    <li key={idx}>
+                                                        <strong>{match.matchName}</strong>: <span className="underline">{match.score}% similarity</span>
+                                                    </li>
+                                                ))}
+                                            </ul>
+                                        </div>
+                                    )}
 
                                     <div className="mb-4 relative z-10">
                                         <div className="flex justify-between items-center mb-1">

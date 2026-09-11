@@ -22,7 +22,7 @@ export async function POST(request) {
         }
 
         const body = await request.json();
-        const { submissionText, rubric, strictness, studentId, studentNotes, rubricFile, studentFile, studentFiles, generateFeedback = true, maxPoints = 100 } = body;
+        const { submissionText, rubric, strictness, studentId, studentNotes, rubricFile, studentFile, studentFiles, generateFeedback = false, maxPoints = 100, pastExemplars = [] } = body;
 
         if (!submissionText) {
             return NextResponse.json({ error: "No submission text provided" }, { status: 400 });
@@ -36,12 +36,19 @@ export async function POST(request) {
         const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
         const studentContext = studentNotes || "No specific instructions provided for this student.";
 
+        let exemplarsSection = "";
+        if (Array.isArray(pastExemplars) && pastExemplars.length > 0) {
+            exemplarsSection = `\n\n**TEACHER MANUAL GRADE ADJUSTMENTS & EXEMPLARS FROM PREVIOUS STUDENTS/CLASSES:**\nThe teacher has previously reviewed and manually adjusted grades for this assignment. Use these actual teacher decisions to calibrate your strictness, partial credit decisions, and grading style:\n` +
+            pastExemplars.slice(0, 6).map((ex, idx) => `[Teacher Example ${idx + 1}]:\nStudent Text Snippet: "${ex.textSnippet || 'N/A'}"\nTeacher Assigned Grade: ${ex.grade}${ex.feedback ? `\nTeacher Feedback/Note: "${ex.feedback}"` : ''}`).join("\n\n");
+        }
+
         // Construct the Prompt and System Instructions
         const systemInstruction = `
 You are an expert high school teacher grading an assignment. You will evaluate the student's submission based on the provided rubric.
 
 **TEACHER INSTRUCTIONS / RUBRIC:**
 ${rubric || "No specific rubric provided. Evaluate for general high school level clarity, accuracy, and grammar."}
+${exemplarsSection}
 
 **STUDENT CONTEXT (Keep this in mind for your feedback tone):**
 ${studentContext}
@@ -49,6 +56,12 @@ ${studentContext}
 **GRADING STRICTNESS (1-10 Scale, 1 is easiest, 10 is hardest):**
 The teacher has requested a strictness level of: ${strictness}/10. 
 If the strictness is low, be very lenient and round up grades. If the strictness is high, be highly critical of minor errors.
+
+**SUBMISSION LENGTH & EFFORT AWARENESS:**
+Evaluate whether the student's submission text reflects genuine effort and completeness relative to typical expectations. If an assignment expects multi-paragraph or detailed responses and the submission is only 1-2 short sentences or low effort, deduct points accordingly for lack of thoroughness.
+
+**EVALUATION REASONING & CONFIDENCE:**
+Analyze the submission step-by-step against each requirement. Assess your confidence in grading this submission. Set confidence to "high" if clear, "medium" if partially ambiguous or minor format issues exist, or "low" if the text is blurry, truncated, or highly ambiguous.
 
 **CRITICAL MISSING WORK POLICY (READ CAREFULLY):**
 You MUST first determine if the student submitted any actual work. 
@@ -74,8 +87,8 @@ The assignment is worth a maximum of ${maxPoints} points. You MUST calculate and
 Make sure your "suggested_grade" natively matches the ${maxPoints} point scale (for example, if they got everything right, return ${maxPoints}). Do NOT treat the grade as a generic percentage unless maxPoints is 100.
 
 ${generateFeedback 
-    ? `- Include a "suggested_grade" key with your final numeric score.\n- Include a "feedback_text" key with a paragraph of constructive feedback directly to the student.`
-    : `- Only return a "suggested_grade" key.`
+    ? `- Include a "suggested_grade" key with your final numeric score.\n- Include a "feedback_text" key with a paragraph of constructive feedback directly to the student.\n- Include a "confidence" key ("high", "medium", or "low").`
+    : `- Include a "suggested_grade" key and a "confidence" key ("high", "medium", or "low").`
 }
 `;
 
@@ -131,6 +144,10 @@ CRITICAL REMINDER: Look closely at the student's file and text. If both are comp
                     type: "string",
                     description: "The numeric score earned."
                 },
+                confidence: {
+                    type: "string",
+                    description: "AI confidence level: high, medium, or low."
+                },
                 ...(generateFeedback ? {
                     feedback_text: {
                         type: "string",
@@ -182,7 +199,8 @@ CRITICAL REMINDER: Look closely at the student's file and text. If both are comp
 
         return NextResponse.json({
             grade: parsedResult.suggested_grade,
-            feedback: parsedResult.feedback_text
+            feedback: parsedResult.feedback_text,
+            confidence: parsedResult.confidence || "high"
         });
 
     } catch (error) {
