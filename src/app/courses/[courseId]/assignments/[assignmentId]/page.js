@@ -52,6 +52,20 @@ export default function GradingWorkspace() {
     const [batchResults, setBatchResults] = useState({}); // { [submissionId]: { grade, feedback } }
     const stopGradingRef = useRef(false);
 
+    // Sidebar student card DOM refs for auto-scrolling
+    const studentItemRefs = useRef({});
+
+    useEffect(() => {
+        if (selectedSubmission?.id && studentItemRefs.current[selectedSubmission.id]) {
+            setTimeout(() => {
+                studentItemRefs.current[selectedSubmission.id]?.scrollIntoView({
+                    block: 'nearest',
+                    behavior: 'smooth'
+                });
+            }, 100);
+        }
+    }, [selectedSubmission?.id]);
+
     // Speed & Intelligence Caching & Similarity
     const submissionCacheRef = useRef({}); // { [submissionId]: docData }
     const masterKeyCacheRef = useRef({}); // { [keyStudentId]: { runtimeRubric, runtimeRubricFile } }
@@ -465,12 +479,14 @@ export default function GradingWorkspace() {
                         }
                     }
                     if (subs.length > 0) {
-                        const firstSub = subs[0];
-                        setSelectedSubmission(firstSub);
+                        const savedStudentId = localStorage.getItem(`last_student_${courseId}_${assignmentId}`);
+                        const restoredSub = subs.find(s => s.id === savedStudentId || s.userId === savedStudentId);
+                        const targetSub = restoredSub || subs[0];
+                        setSelectedSubmission(targetSub);
                         // Load saved student notes & floor
-                        const savedNotes = localStorage.getItem(`student_notes_${firstSub.userId}`);
+                        const savedNotes = localStorage.getItem(`student_notes_${targetSub.userId}`);
                         setStudentNotes(savedNotes || "");
-                        const savedFloor = localStorage.getItem(`student_floor_${firstSub.userId}`);
+                        const savedFloor = localStorage.getItem(`student_floor_${targetSub.userId}`);
                         setStudentGradeFloor(savedFloor || "");
                     }
                     setError(null);
@@ -1406,7 +1422,7 @@ export default function GradingWorkspace() {
                     <div className="min-w-0 pr-4">
                         <h2 className="text-[10px] font-black uppercase tracking-widest text-indigo-500 dark:text-indigo-400 mb-0.5">{courseName || "Loading Course..."}</h2>
                         <h1 className="text-lg font-bold text-slate-900 dark:text-slate-50 leading-tight truncate">
-                            {assignmentName || "Grading Workspace"} <span className="text-xs text-indigo-500 ml-2 bg-indigo-50 px-2 py-1 rounded">v3.94</span>
+                            {assignmentName || "Grading Workspace"} <span className="text-xs text-indigo-500 ml-2 bg-indigo-50 px-2 py-1 rounded">v3.95</span>
                         </h1>
                     </div>
                 </div>
@@ -1530,8 +1546,10 @@ export default function GradingWorkspace() {
                             filteredSubmissions.map((sub) => (
                                 <div
                                     key={sub.id}
+                                    ref={(el) => { studentItemRefs.current[sub.id] = el; }}
                                     onClick={() => {
                                         setSelectedSubmission(sub);
+                                        localStorage.setItem(`last_student_${courseId}_${assignmentId}`, sub.id);
                                         setAiFeedback(batchResults[sub.id] || null);
                                         const savedNotes = localStorage.getItem(`student_notes_${sub.userId}`);
                                         setStudentNotes(savedNotes || "");
@@ -1645,13 +1663,21 @@ export default function GradingWorkspace() {
                                         {sub.assignmentSubmission?.attachments?.map((att, i) => (
                                             att.driveFile?.thumbnailUrl && (
                                                 <div key={i} className="flex-1 min-w-[30%] max-w-[80px] bg-slate-100 dark:bg-slate-800 rounded border border-slate-200 dark:border-slate-800 overflow-hidden shadow-sm aspect-video relative">
-                                                    <a href={att.driveFile?.alternateLink || "#"} target="_blank" rel="noopener noreferrer">
+                                                    {att.driveFile?.alternateLink ? (
+                                                        <a href={att.driveFile.alternateLink} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()}>
+                                                            <img
+                                                                src={`/api/drive/thumbnail?url=${encodeURIComponent(att.driveFile.thumbnailUrl)}`}
+                                                                alt="Attachment Thumbnail"
+                                                                className="absolute inset-0 w-full h-full object-cover opacity-90 hover:opacity-100 transition-opacity"
+                                                            />
+                                                        </a>
+                                                    ) : (
                                                         <img
                                                             src={`/api/drive/thumbnail?url=${encodeURIComponent(att.driveFile.thumbnailUrl)}`}
                                                             alt="Attachment Thumbnail"
-                                                            className="absolute inset-0 w-full h-full object-cover opacity-90 hover:opacity-100 transition-opacity"
+                                                            className="absolute inset-0 w-full h-full object-cover opacity-90 transition-opacity"
                                                         />
-                                                    </a>
+                                                    )}
                                                 </div>
                                             )
                                         ))}

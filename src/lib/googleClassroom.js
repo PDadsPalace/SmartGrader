@@ -44,22 +44,57 @@ export async function getCourseAssignments(accessToken, courseId) {
 export async function getAssignmentSubmissions(accessToken, courseId, courseWorkId) {
     try {
         const classroom = getClassroomClient(accessToken);
-        const response = await classroom.courses.courseWork.studentSubmissions.list({
-            courseId: courseId,
-            courseWorkId: courseWorkId,
-        });
+        
+        // Paginate studentSubmissions.list to get ALL student submissions
+        let submissions = [];
+        let subPageToken = undefined;
+        do {
+            const response = await classroom.courses.courseWork.studentSubmissions.list({
+                courseId: courseId,
+                courseWorkId: courseWorkId,
+                pageSize: 100,
+                pageToken: subPageToken,
+            });
+            if (response.data.studentSubmissions) {
+                submissions = submissions.concat(response.data.studentSubmissions);
+            }
+            subPageToken = response.data.nextPageToken;
+        } while (subPageToken);
 
-        const submissions = response.data.studentSubmissions || [];
+        // Paginate students.list to get ALL enrolled student profiles in the course
+        let students = [];
+        let studentPageToken = undefined;
+        do {
+            const studentsResponse = await classroom.courses.students.list({
+                courseId: courseId,
+                pageSize: 100,
+                pageToken: studentPageToken,
+            });
+            if (studentsResponse.data.students) {
+                students = students.concat(studentsResponse.data.students);
+            }
+            studentPageToken = studentsResponse.data.nextPageToken;
+        } while (studentPageToken);
 
-        // For this prototype, we will try to fetch the student profiles
-        // to associate names with the submission IDs
-        const studentsResponse = await classroom.courses.students.list({
-            courseId: courseId,
-        });
-        const students = studentsResponse.data.students || [];
         const studentMap = {};
         for (const student of students) {
-            studentMap[student.userId] = student.profile;
+            if (student.userId && student.profile) {
+                studentMap[student.userId] = student.profile;
+            }
+        }
+
+        // Fallback: If any student's userId wasn't in studentMap (e.g. co-teachers or removed students), fetch user profile directly
+        for (const sub of submissions) {
+            if (sub.userId && !studentMap[sub.userId]) {
+                try {
+                    const userProfileRes = await classroom.userProfiles.get({ userId: sub.userId });
+                    if (userProfileRes.data && userProfileRes.data.name) {
+                        studentMap[sub.userId] = userProfileRes.data;
+                    }
+                } catch (e) {
+                    // Profile fetch failed (e.g. deleted user or restricted)
+                }
+            }
         }
 
         // Attach student profiles to submissions
