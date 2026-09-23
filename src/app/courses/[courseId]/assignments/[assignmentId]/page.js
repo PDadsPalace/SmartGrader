@@ -7,6 +7,8 @@ import { ArrowLeft, User, FileText, Settings2, Sparkles, CheckCircle2, ListCheck
 import Papa from "papaparse";
 import stringSimilarity from "string-similarity";
 
+import { parseGoogleFormCSV } from "@/lib/formCsvParser";
+
 export default function GradingWorkspace() {
     const { data: session, status } = useSession();
     const router = useRouter();
@@ -187,6 +189,14 @@ export default function GradingWorkspace() {
     const [isEdpuzzleMode, setIsEdpuzzleMode] = useState(false);
     const [importingGrades, setImportingGrades] = useState(false);
     const [importedCount, setImportedCount] = useState(0);
+
+    // Direct Response CSV Import Modals & AI Rubric Generator State
+    const [showFormsCsvModal, setShowFormsCsvModal] = useState(false);
+    const [formsCsvError, setFormsCsvError] = useState("");
+    const [showEdpuzzleCsvModal, setShowEdpuzzleCsvModal] = useState(false);
+    const [edpuzzleCsvError, setEdpuzzleCsvError] = useState("");
+    const [generatingRubric, setGeneratingRubric] = useState(false);
+    const [selectedSimilarityMatch, setSelectedSimilarityMatch] = useState(null);
 
     // Mixed-format Google Form metadata (populated when a MIXED form is loaded)
     const [mixedFormMeta, setMixedFormMeta] = useState(null);
@@ -454,9 +464,15 @@ export default function GradingWorkspace() {
         return false;
     };
 
+    const hasFetchedSubmissionsRef = useRef(false);
+    const accessToken = session?.accessToken;
+
     useEffect(() => {
-        if (session?.accessToken && courseId && assignmentId) {
-            setLoading(true);
+        if (accessToken && courseId && assignmentId) {
+            // Only set full loading screen if we have no submissions loaded yet
+            if (submissions.length === 0) {
+                setLoading(true);
+            }
             fetch(`/api/courses/${courseId}/assignments/${assignmentId}/submissions`)
                 .then((res) => res.json())
                 .then((data) => {
@@ -479,27 +495,35 @@ export default function GradingWorkspace() {
                         }
                     }
                     if (subs.length > 0) {
-                        const savedStudentId = localStorage.getItem(`last_student_${courseId}_${assignmentId}`);
-                        const restoredSub = subs.find(s => s.id === savedStudentId || s.userId === savedStudentId);
-                        const targetSub = restoredSub || subs[0];
-                        setSelectedSubmission(targetSub);
-                        // Load saved student notes & floor
-                        const savedNotes = localStorage.getItem(`student_notes_${targetSub.userId}`);
-                        setStudentNotes(savedNotes || "");
-                        const savedFloor = localStorage.getItem(`student_floor_${targetSub.userId}`);
-                        setStudentGradeFloor(savedFloor || "");
+                        setSelectedSubmission(currentSub => {
+                            if (currentSub?.id && subs.some(s => s.id === currentSub.id)) {
+                                return currentSub;
+                            }
+                            const savedStudentId = localStorage.getItem(`last_student_${courseId}_${assignmentId}`);
+                            const restoredSub = subs.find(s => s.id === savedStudentId || s.userId === savedStudentId);
+                            const targetSub = restoredSub || subs[0];
+
+                            const savedNotes = localStorage.getItem(`student_notes_${targetSub.userId}`);
+                            setStudentNotes(savedNotes || "");
+                            const savedFloor = localStorage.getItem(`student_floor_${targetSub.userId}`);
+                            setStudentGradeFloor(savedFloor || "");
+
+                            return targetSub;
+                        });
                     }
                     setError(null);
                 })
                 .catch((err) => {
                     console.error(err);
-                    setError("Could not load student submissions.");
+                    if (submissions.length === 0) {
+                        setError("Could not load student submissions.");
+                    }
                 })
                 .finally(() => {
                     setLoading(false);
                 });
         }
-    }, [session, courseId, assignmentId]);
+    }, [accessToken, courseId, assignmentId]);
 
     // Fetch the actual Google Doc content when a student is selected (checking in-memory cache first)
     useEffect(() => {
@@ -882,6 +906,155 @@ export default function GradingWorkspace() {
                 setRosterSetupError("Error reading the CSV file.");
             }
         });
+    };
+
+    // Direct Response CSV Importers & AI Rubric Generator
+    const handleFormsCsvUpload = (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        Papa.parse(file, {
+            skipEmptyLines: true,
+            complete: (results) => {
+                const data = results.data;
+                if (!data || data.length < 2) {
+                    setFormsCsvError("Invalid CSV format or empty data.");
+                    return;
+                }
+
+                let matchedCount = 0;
+                submissions.forEach(sub => {
+                    const studentEmail = sub.studentProfile?.emailAddress;
+                    const studentName = sub.studentProfile?.name?.fullName;
+
+                    const parseRes = parseGoogleFormCSV(data, studentEmail, studentName);
+                    if (parseRes && parseRes.content && !parseRes.content.startsWith("Unmatched Form CSV")) {
+                        matchedCount++;
+                        submissionCacheRef.current[sub.id] = parseRes;
+                        if (parseRes.nativeGrade) {
+                            sub.nativeGrade = parseRes.nativeGrade;
+                        }
+                    }
+                });
+
+                if (matchedCount === 0) {
+                    setFormsCsvError("Could not match student names/emails in this CSV to your Classroom roster. Verify header columns include 'Email Address' or 'Student Name'.");
+                    return;
+                }
+
+                runSimilarityCheck();
+                setShowFormsCsvModal(false);
+                setFormsCsvError("");
+
+                if (selectedSubmission && submissionCacheRef.current[selectedSubmission.id]) {
+                    const cached = submissionCacheRef.current[selectedSubmission.id];
+                    setSubmissionContent(cached.content);
+                    if (cached.nativeGrade) {
+                        setSelectedSubmission(prev => ({ ...prev, nativeGrade: cached.nativeGrade }));
+                    }
+                }
+            },
+            error: () => {
+                setFormsCsvError("Error reading the CSV file.");
+            }
+        });
+    };
+
+    const handleEdpuzzleCsvUpload = (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        Papa.parse(file, {
+            skipEmptyLines: true,
+            complete: (results) => {
+                const data = results.data;
+                if (!data || data.length < 2) {
+                    setEdpuzzleCsvError("Invalid Edpuzzle CSV file or empty data.");
+                    return;
+                }
+
+                const headers = data[0].map(h => String(h || "").trim().toLowerCase());
+                let nameIdx = headers.findIndex(h => h.includes("name") || h.includes("student"));
+                let emailIdx = headers.findIndex(h => h.includes("email"));
+                let gradeIdx = headers.findIndex(h => h.includes("grade") || h.includes("score") || h.includes("%") || h.includes("result"));
+
+                if (gradeIdx === -1) gradeIdx = headers.findIndex(h => h.includes("total") || h.includes("final"));
+
+                const newResults = {};
+                let count = 0;
+
+                submissions.forEach(sub => {
+                    const subEmail = sub.studentProfile?.emailAddress?.toLowerCase().trim();
+                    const subName = sub.studentProfile?.name?.fullName?.toLowerCase().trim();
+
+                    const matchedRow = data.slice(1).find(row => {
+                        if (emailIdx !== -1 && row[emailIdx] && subEmail) {
+                            if (String(row[emailIdx]).toLowerCase().trim() === subEmail) return true;
+                        }
+                        if (nameIdx !== -1 && row[nameIdx] && subName) {
+                            const rowName = String(row[nameIdx]).toLowerCase().trim();
+                            if (rowName.includes(subName) || subName.includes(rowName)) return true;
+                        }
+                        return false;
+                    });
+
+                    if (matchedRow && gradeIdx !== -1 && matchedRow[gradeIdx] !== undefined) {
+                        const rawGrade = String(matchedRow[gradeIdx]).replace(/[^\d.]/g, '').trim();
+                        if (rawGrade) {
+                            newResults[sub.id] = {
+                                grade: rawGrade,
+                                feedback: "Grade imported directly from Edpuzzle CSV gradebook."
+                            };
+                            count++;
+                        }
+                    }
+                });
+
+                if (count === 0) {
+                    setEdpuzzleCsvError("Could not match student grades from this Edpuzzle CSV to your Classroom roster.");
+                    return;
+                }
+
+                setBatchResults(prev => ({ ...prev, ...newResults }));
+                localStorage.setItem(`grades_${courseId}_${assignmentId}`, JSON.stringify({ ...batchResults, ...newResults }));
+                setImportedCount(count);
+                setShowEdpuzzleCsvModal(false);
+                setEdpuzzleCsvError("");
+
+                if (selectedSubmission && newResults[selectedSubmission.id]) {
+                    setAiFeedback(newResults[selectedSubmission.id]);
+                }
+            },
+            error: () => {
+                setEdpuzzleCsvError("Failed to parse Edpuzzle CSV.");
+            }
+        });
+    };
+
+    const handleGenerateRubric = async () => {
+        if (!assignmentName) return;
+        setGeneratingRubric(true);
+        try {
+            const prompt = `Generate a clear, 4-category grading rubric for a school assignment titled "${assignmentName}". Points possible: ${assignmentInfo?.maxPoints || 100}. Format as bullet points for each criteria band.`;
+            const res = await fetch('/api/grade', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    rubric: "Generate rubric",
+                    strictness: 5,
+                    submissionText: prompt,
+                    maxPoints: assignmentInfo?.maxPoints || 100
+                })
+            });
+            const data = await res.json();
+            if (data.feedback) {
+                setRubric(data.feedback);
+            }
+        } catch (e) {
+            console.error("Failed to generate rubric", e);
+        } finally {
+            setGeneratingRubric(false);
+        }
     };
 
     const handleExportCSV = () => {
@@ -1422,7 +1595,7 @@ export default function GradingWorkspace() {
                     <div className="min-w-0 pr-4">
                         <h2 className="text-[10px] font-black uppercase tracking-widest text-indigo-500 dark:text-indigo-400 mb-0.5">{courseName || "Loading Course..."}</h2>
                         <h1 className="text-lg font-bold text-slate-900 dark:text-slate-50 leading-tight truncate">
-                            {assignmentName || "Grading Workspace"} <span className="text-xs text-indigo-500 ml-2 bg-indigo-50 px-2 py-1 rounded">v3.95</span>
+                            {assignmentName || "Grading Workspace"} <span className="text-xs text-indigo-500 ml-2 bg-indigo-50 px-2 py-1 rounded">v4.00</span>
                         </h1>
                     </div>
                 </div>
@@ -1476,6 +1649,20 @@ export default function GradingWorkspace() {
                             </select>
                         </div>
                         <div className="flex flex-wrap items-center gap-2 w-full justify-end">
+                            <button
+                                onClick={() => setShowFormsCsvModal(true)}
+                                className="text-xs bg-indigo-50 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-300 hover:bg-indigo-100 border border-indigo-200 dark:border-indigo-800 px-2.5 py-1 rounded-lg font-bold flex items-center gap-1 transition-colors h-8 whitespace-nowrap"
+                                title="Import Google Form responses directly from a CSV / Google Sheet export"
+                            >
+                                <UploadCloud className="w-3.5 h-3.5 text-indigo-600" /> Form CSV
+                            </button>
+                            <button
+                                onClick={() => setShowEdpuzzleCsvModal(true)}
+                                className="text-xs bg-violet-50 dark:bg-violet-900/40 text-violet-700 dark:text-violet-300 hover:bg-violet-100 border border-violet-200 dark:border-violet-800 px-2.5 py-1 rounded-lg font-bold flex items-center gap-1 transition-colors h-8 whitespace-nowrap"
+                                title="Import Edpuzzle gradebook directly from a downloaded CSV"
+                            >
+                                <Zap className="w-3.5 h-3.5 text-violet-600" /> Edpuzzle CSV
+                            </button>
                             {Object.keys(batchResults).length > 0 && (
                                 <div className="text-xs font-black px-3 py-2 rounded-lg bg-indigo-50 dark:bg-indigo-900/40 border border-indigo-200 text-indigo-700 dark:text-indigo-400 flex items-center gap-1.5 shadow-sm h-8 whitespace-nowrap">
                                     <span className="opacity-70 font-semibold tracking-wider">AVG:</span>
@@ -1869,7 +2056,13 @@ export default function GradingWorkspace() {
 
                                     <div>
                                         <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
-                                            <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300">Answer Key / Rubric</label>
+                                            <div className="flex items-center gap-2">
+                                                <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300">Answer Key / Rubric</label>
+                                                <button onClick={handleGenerateRubric} disabled={generatingRubric} className="text-xs bg-indigo-50 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-300 hover:bg-indigo-100 border border-indigo-200 dark:border-indigo-800 px-2.5 py-1 rounded-lg font-bold flex items-center gap-1 transition-colors">
+                                                    <Sparkles className="w-3.5 h-3.5 text-indigo-600 animate-pulse" />
+                                                    {generatingRubric ? "Generating..." : "Generate Rubric with AI"}
+                                                </button>
+                                            </div>
 
                                             <div className="flex flex-wrap items-center gap-2">
                                                 <label className={`flex items-center gap-2 text-xs font-bold cursor-pointer px-3 py-1.5 rounded-lg border transition-colors ${generateFeedback ? 'bg-indigo-100 border-indigo-300 text-indigo-800 dark:bg-indigo-900/60 dark:border-indigo-700 dark:text-indigo-300' : 'bg-slate-50 border-slate-200 text-slate-600 dark:bg-slate-900/40 dark:border-slate-800 dark:text-slate-400 hover:bg-slate-100'}`}>
@@ -2290,6 +2483,97 @@ export default function GradingWorkspace() {
                                     className="hidden"
                                     accept=".csv"
                                     onChange={handleRosterUpload}
+                                />
+                            </label>
+                        </div>
+                    </div>
+                </div>
+            )}
+            {/* Google Form Responses CSV Direct Import Modal */}
+            {showFormsCsvModal && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm animate-in fade-in duration-200">
+                    <div className="bg-white dark:bg-slate-950 rounded-2xl shadow-xl w-full max-w-md overflow-hidden animate-in zoom-in-95 duration-200">
+                        <div className="px-6 py-4 border-b border-slate-200 dark:border-slate-800 flex justify-between items-center bg-indigo-50/50">
+                            <h2 className="text-lg font-bold text-indigo-900 dark:text-indigo-300 flex items-center gap-2">
+                                <UploadCloud className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
+                                Import Google Form Responses CSV
+                            </h2>
+                            <button onClick={() => setShowFormsCsvModal(false)} className="text-slate-400 hover:text-slate-600 dark:text-slate-300 p-1 rounded-lg transition-colors hover:bg-slate-100 dark:hover:bg-slate-800">
+                                <X className="w-5 h-5" />
+                            </button>
+                        </div>
+
+                        <div className="p-6 space-y-4 text-sm text-slate-700 dark:text-slate-300">
+                            <p className="font-medium">
+                                Export your Google Form or linked Google Sheet responses to a <strong>.CSV file</strong> and drop it here.
+                            </p>
+                            <p className="text-xs text-slate-500">
+                                Smartgraider will match students by email or name, extract question prompts & answers, and allow full AI essay grading while keeping auto-graded totals.
+                            </p>
+
+                            {formsCsvError && (
+                                <div className="p-3 bg-red-50 dark:bg-red-900/30 text-red-600 border border-red-200 dark:border-red-800 rounded-lg text-xs font-semibold">
+                                    {formsCsvError}
+                                </div>
+                            )}
+
+                            <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-slate-300 dark:border-slate-700 border-dashed rounded-xl cursor-pointer bg-slate-50 dark:bg-slate-900 hover:bg-indigo-50 dark:hover:bg-indigo-900/40 hover:border-indigo-300 transition-colors group relative overflow-hidden">
+                                <div className="flex flex-col items-center justify-center pt-5 pb-6 text-slate-500 dark:text-slate-400 group-hover:text-indigo-600 transition-colors z-10 p-4 text-center">
+                                    <UploadCloud className="w-8 h-8 mb-2 text-indigo-500" />
+                                    <p className="mb-1 text-sm font-bold">Select Form Responses CSV</p>
+                                    <p className="text-xs text-slate-400">Click to browse or drop CSV file</p>
+                                </div>
+                                <input
+                                    type="file"
+                                    className="hidden"
+                                    accept=".csv"
+                                    onChange={handleFormsCsvUpload}
+                                />
+                            </label>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Edpuzzle CSV Direct Import Modal */}
+            {showEdpuzzleCsvModal && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm animate-in fade-in duration-200">
+                    <div className="bg-white dark:bg-slate-950 rounded-2xl shadow-xl w-full max-w-md overflow-hidden animate-in zoom-in-95 duration-200">
+                        <div className="px-6 py-4 border-b border-slate-200 dark:border-slate-800 flex justify-between items-center bg-violet-50/50">
+                            <h2 className="text-lg font-bold text-violet-900 dark:text-violet-300 flex items-center gap-2">
+                                <Zap className="w-5 h-5 text-violet-600 dark:text-violet-400" />
+                                Import Edpuzzle Gradebook CSV
+                            </h2>
+                            <button onClick={() => setShowEdpuzzleCsvModal(false)} className="text-slate-400 hover:text-slate-600 dark:text-slate-300 p-1 rounded-lg transition-colors hover:bg-slate-100 dark:hover:bg-slate-800">
+                                <X className="w-5 h-5" />
+                            </button>
+                        </div>
+
+                        <div className="p-6 space-y-4 text-sm text-slate-700 dark:text-slate-300">
+                            <p className="font-medium">
+                                Download the <strong>CSV Gradebook</strong> directly from Edpuzzle class view and select it below to import scores instantly.
+                            </p>
+                            <p className="text-xs text-slate-500">
+                                Bypasses Google Classroom sync delays. Student grades are matched by name and email automatically.
+                            </p>
+
+                            {edpuzzleCsvError && (
+                                <div className="p-3 bg-red-50 dark:bg-red-900/30 text-red-600 border border-red-200 dark:border-red-800 rounded-lg text-xs font-semibold">
+                                    {edpuzzleCsvError}
+                                </div>
+                            )}
+
+                            <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-slate-300 dark:border-slate-700 border-dashed rounded-xl cursor-pointer bg-slate-50 dark:bg-slate-900 hover:bg-violet-50 dark:hover:bg-violet-900/40 hover:border-violet-300 transition-colors group relative overflow-hidden">
+                                <div className="flex flex-col items-center justify-center pt-5 pb-6 text-slate-500 dark:text-slate-400 group-hover:text-violet-600 transition-colors z-10 p-4 text-center">
+                                    <Zap className="w-8 h-8 mb-2 text-violet-500" />
+                                    <p className="mb-1 text-sm font-bold">Select Edpuzzle CSV</p>
+                                    <p className="text-xs text-slate-400">Click to browse or drop CSV file</p>
+                                </div>
+                                <input
+                                    type="file"
+                                    className="hidden"
+                                    accept=".csv"
+                                    onChange={handleEdpuzzleCsvUpload}
                                 />
                             </label>
                         </div>

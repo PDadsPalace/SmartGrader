@@ -6,7 +6,7 @@ import { ThemeProvider } from "next-themes";
 export default function Providers({ children }) {
     return (
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
-            <SessionProvider>{children}</SessionProvider>
+            <SessionProvider refetchOnWindowFocus={false}>{children}</SessionProvider>
         </ThemeProvider>
     );
 }
