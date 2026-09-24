@@ -3,7 +3,7 @@
 import { useSession } from "next-auth/react";
 import { useEffect, useState, useRef } from "react";
 import { usePathname, useRouter } from "next/navigation";
-import { ArrowLeft, User, FileText, Settings2, Sparkles, CheckCircle2, ListChecks, Download, RefreshCw, X, AlertTriangle, UploadCloud, Zap, ZoomIn, ExternalLink, Eye } from "lucide-react";
+import { ArrowLeft, User, FileText, Settings2, Sparkles, CheckCircle2, ListChecks, Download, RefreshCw, X, AlertTriangle, UploadCloud, Zap, ZoomIn, ExternalLink, Eye, Maximize2, Minimize2, Plus, Minus, Image, Layers } from "lucide-react";
 import Papa from "papaparse";
 import stringSimilarity from "string-similarity";
 
@@ -48,29 +48,46 @@ export default function GradingWorkspace() {
     const [generateFeedback, setGenerateFeedback] = useState(false);
     const [pastExemplars, setPastExemplars] = useState([]);
 
-    // Hover Preview State for Attachments
+    // Hover Preview & Multi-Page Zoom State for Attachments
     const [hoveredPreview, setHoveredPreview] = useState(null);
+    const [previewSize, setPreviewSize] = useState("normal"); // 'normal' | 'large' | 'fullscreen'
+    const [previewZoom, setPreviewZoom] = useState(1); // 1, 1.25, 1.5, 2
+    const [previewMode, setPreviewMode] = useState("image"); // 'image' | 'doc'
+    const leaveTimerRef = useRef(null);
+
+    const getDriveFileId = (att) => {
+        if (att?.driveFile?.id) return att.driveFile.id;
+        if (att?.id) return att.id;
+        const link = att?.driveFile?.alternateLink || att?.alternateLink || "";
+        const match = link.match(/\/d\/([a-zA-Z0-9_-]+)/) || link.match(/id=([a-zA-Z0-9_-]+)/);
+        return match ? match[1] : null;
+    };
 
     const getHighResThumbnailUrl = (url) => {
         if (!url) return "";
         if (url.includes("=s")) {
-            return url.replace(/=s\d+/, "=s1200");
+            return url.replace(/=s\d+/, "=s1600");
         }
         if (url.includes("=w")) {
-            return url.replace(/=w\d+-h\d+/, "=s1200");
+            return url.replace(/=w\d+-h\d+/, "=s1600");
         }
-        return url + (url.includes("?") ? "&s=1200" : "=s1200");
+        return url + (url.includes("?") ? "&s=1600" : "=s1600");
     };
 
     const handleThumbnailMouseEnter = (e, att, studentName) => {
+        if (leaveTimerRef.current) {
+            clearTimeout(leaveTimerRef.current);
+        }
+
         const rect = e.currentTarget.getBoundingClientRect();
         const rawUrl = att.driveFile?.thumbnailUrl || att.thumbnailUrl;
         if (!rawUrl) return;
 
         const highRes = getHighResThumbnailUrl(rawUrl);
+        const fileId = getDriveFileId(att);
 
-        const previewWidth = 420;
-        const previewHeight = 360;
+        const previewWidth = previewSize === "large" ? 700 : 460;
+        const previewHeight = 420;
 
         let left = rect.right + 12;
         if (left + previewWidth > window.innerWidth - 20) {
@@ -85,6 +102,8 @@ export default function GradingWorkspace() {
         setHoveredPreview({
             url: `/api/drive/thumbnail?url=${encodeURIComponent(rawUrl)}`,
             highResUrl: `/api/drive/thumbnail?url=${encodeURIComponent(highRes)}`,
+            fileId: fileId,
+            iframeUrl: fileId ? `https://drive.google.com/file/d/${fileId}/preview` : null,
             title: att.driveFile?.title || att.title || "Submission Attachment",
             studentName: studentName || "Student Submission",
             alternateLink: att.driveFile?.alternateLink || att.alternateLink,
@@ -94,6 +113,18 @@ export default function GradingWorkspace() {
     };
 
     const handleThumbnailMouseLeave = () => {
+        leaveTimerRef.current = setTimeout(() => {
+            setHoveredPreview(null);
+        }, 300);
+    };
+
+    const handlePopoverMouseEnter = () => {
+        if (leaveTimerRef.current) {
+            clearTimeout(leaveTimerRef.current);
+        }
+    };
+
+    const handlePopoverMouseLeave = () => {
         setHoveredPreview(null);
     };
     const [batchGrading, setBatchGrading] = useState(false);
@@ -2693,50 +2724,161 @@ export default function GradingWorkspace() {
             {/* Floating Hover Magnified Preview Overlay */}
             {hoveredPreview && (
                 <div 
-                    className="fixed z-50 pointer-events-none transition-all duration-150 ease-out"
-                    style={{
-                        left: `${hoveredPreview.x}px`,
-                        top: `${hoveredPreview.y}px`,
-                        width: '420px',
-                    }}
+                    className={`fixed z-50 transition-all duration-150 ease-out ${
+                        previewSize === 'fullscreen'
+                            ? 'inset-4 md:inset-8 flex items-center justify-center bg-slate-950/70 backdrop-blur-md p-4'
+                            : ''
+                    }`}
+                    style={
+                        previewSize === 'fullscreen'
+                            ? {}
+                            : {
+                                  left: `${hoveredPreview.x}px`,
+                                  top: `${hoveredPreview.y}px`,
+                                  width: previewSize === 'large' ? '700px' : '460px',
+                              }
+                    }
+                    onMouseEnter={handlePopoverMouseEnter}
+                    onMouseLeave={handlePopoverMouseLeave}
                 >
-                    <div className="bg-white dark:bg-slate-900 border-2 border-indigo-500/80 dark:border-indigo-400/80 rounded-2xl shadow-2xl p-3.5 backdrop-blur-md animate-in fade-in zoom-in-95 duration-150 overflow-hidden">
-                        {/* Header info */}
-                        <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-2 mb-2">
-                            <div className="min-w-0 pr-2">
-                                <span className="text-[10px] font-extrabold uppercase tracking-wider bg-indigo-100 text-indigo-800 dark:bg-indigo-900/60 dark:text-indigo-300 px-2 py-0.5 rounded-full">
-                                    {hoveredPreview.studentName}
-                                </span>
+                    <div 
+                        className={`bg-white dark:bg-slate-900 border-2 border-indigo-500/80 dark:border-indigo-400/80 rounded-2xl shadow-2xl backdrop-blur-md animate-in fade-in zoom-in-95 duration-150 overflow-hidden flex flex-col ${
+                            previewSize === 'fullscreen' ? 'w-full h-full max-w-6xl p-5' : 'p-3.5 max-h-[85vh]'
+                        }`}
+                    >
+                        {/* Header info & controls */}
+                        <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-2 mb-2 flex-wrap gap-2">
+                            <div className="min-w-0 pr-2 flex-1">
+                                <div className="flex items-center gap-2">
+                                    <span className="text-[10px] font-extrabold uppercase tracking-wider bg-indigo-100 text-indigo-800 dark:bg-indigo-900/60 dark:text-indigo-300 px-2 py-0.5 rounded-full">
+                                        {hoveredPreview.studentName}
+                                    </span>
+                                    {hoveredPreview.fileId && (
+                                        <span className="text-[10px] font-semibold bg-emerald-100 text-emerald-800 dark:bg-emerald-900/50 dark:text-emerald-300 px-2 py-0.5 rounded-full flex items-center gap-1">
+                                            <Layers className="w-3 h-3" /> Multi-Page Doc
+                                        </span>
+                                    )}
+                                </div>
                                 <p className="text-xs font-bold text-slate-800 dark:text-slate-200 truncate mt-1">
                                     {hoveredPreview.title}
                                 </p>
                             </div>
-                            <span className="text-[10px] text-slate-500 dark:text-slate-400 font-medium flex items-center gap-1 bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded-md flex-shrink-0">
-                                <ZoomIn className="w-3 h-3 text-indigo-500" /> Hover Preview
-                            </span>
+
+                            {/* View Controls & Size Toggles */}
+                            <div className="flex items-center gap-1.5 bg-slate-100 dark:bg-slate-800 p-1 rounded-lg">
+                                {/* Mode Selector: Image vs Doc Iframe */}
+                                {hoveredPreview.iframeUrl && (
+                                    <div className="flex items-center bg-white dark:bg-slate-950 rounded border border-slate-200 dark:border-slate-800 p-0.5 mr-1">
+                                        <button
+                                            onClick={() => setPreviewMode('image')}
+                                            className={`px-2 py-0.5 text-[10px] font-bold rounded flex items-center gap-1 transition-colors ${
+                                                previewMode === 'image' 
+                                                    ? 'bg-indigo-600 text-white' 
+                                                    : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'
+                                            }`}
+                                            title="View High-Res Image Preview"
+                                        >
+                                            <Image className="w-3 h-3" /> Image
+                                        </button>
+                                        <button
+                                            onClick={() => setPreviewMode('doc')}
+                                            className={`px-2 py-0.5 text-[10px] font-bold rounded flex items-center gap-1 transition-colors ${
+                                                previewMode === 'doc' 
+                                                    ? 'bg-indigo-600 text-white' 
+                                                    : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'
+                                            }`}
+                                            title="View Scrollable Multi-Page Document"
+                                        >
+                                            <FileText className="w-3 h-3" /> Scroll Pages
+                                        </button>
+                                    </div>
+                                )}
+
+                                {/* Zoom Level Buttons (for image mode) */}
+                                {previewMode === 'image' && (
+                                    <div className="flex items-center gap-0.5 mr-1 border-r border-slate-200 dark:border-slate-700 pr-1">
+                                        <button
+                                            onClick={() => setPreviewZoom(z => Math.max(1, z - 0.25))}
+                                            className="p-1 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700 rounded"
+                                            title="Zoom Out"
+                                        >
+                                            <Minus className="w-3 h-3" />
+                                        </button>
+                                        <span className="text-[10px] font-bold w-8 text-center text-slate-700 dark:text-slate-300">
+                                            {Math.round(previewZoom * 100)}%
+                                        </span>
+                                        <button
+                                            onClick={() => setPreviewZoom(z => Math.min(2.5, z + 0.25))}
+                                            className="p-1 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700 rounded"
+                                            title="Zoom In"
+                                        >
+                                            <Plus className="w-3 h-3" />
+                                        </button>
+                                    </div>
+                                )}
+
+                                {/* Size Toggle Buttons */}
+                                <button
+                                    onClick={() => setPreviewSize(s => s === 'normal' ? 'large' : s === 'large' ? 'fullscreen' : 'normal')}
+                                    className="px-2 py-1 text-[10px] font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 rounded flex items-center gap-1"
+                                    title="Toggle Preview Window Size"
+                                >
+                                    {previewSize === 'normal' && <Maximize2 className="w-3 h-3 text-indigo-500" />}
+                                    {previewSize === 'large' && <Maximize2 className="w-3 h-3 text-purple-500" />}
+                                    {previewSize === 'fullscreen' && <Minimize2 className="w-3 h-3 text-amber-500" />}
+                                    {previewSize === 'normal' ? 'Medium' : previewSize === 'large' ? 'Large' : 'Exit Full'}
+                                </button>
+
+                                <button
+                                    onClick={() => setHoveredPreview(null)}
+                                    className="p-1 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-700 rounded"
+                                    title="Close Preview"
+                                >
+                                    <X className="w-3.5 h-3.5" />
+                                </button>
+                            </div>
                         </div>
 
-                        {/* High-res Image Preview */}
-                        <div className="relative rounded-xl overflow-hidden bg-slate-950 flex items-center justify-center min-h-[220px] max-h-[380px] shadow-inner border border-slate-200 dark:border-slate-800">
-                            <img
-                                src={hoveredPreview.highResUrl}
-                                alt={hoveredPreview.title}
-                                className="w-full h-full object-contain max-h-[360px] animate-in fade-in duration-200"
-                                onError={(e) => {
-                                    if (e.target.src !== hoveredPreview.url) {
-                                        e.target.src = hoveredPreview.url;
-                                    }
-                                }}
-                            />
+                        {/* Content Area: Image Preview OR Scrollable Iframe Document */}
+                        <div className="relative rounded-xl overflow-hidden bg-slate-950 flex-1 min-h-[260px] shadow-inner border border-slate-200 dark:border-slate-800 flex items-center justify-center">
+                            {previewMode === 'doc' && hoveredPreview.iframeUrl ? (
+                                <iframe
+                                    src={hoveredPreview.iframeUrl}
+                                    title={hoveredPreview.title}
+                                    className="w-full h-full min-h-[450px] border-0 rounded-xl bg-white"
+                                    allow="autoplay"
+                                />
+                            ) : (
+                                <div className="w-full h-full overflow-auto max-h-[65vh] p-2 flex items-center justify-center bg-slate-950">
+                                    <img
+                                        src={hoveredPreview.highResUrl}
+                                        alt={hoveredPreview.title}
+                                        style={{ transform: `scale(${previewZoom})`, transformOrigin: 'center center' }}
+                                        className="max-w-full h-auto object-contain transition-transform duration-150 rounded"
+                                        onError={(e) => {
+                                            if (e.target.src !== hoveredPreview.url) {
+                                                e.target.src = hoveredPreview.url;
+                                            }
+                                        }}
+                                    />
+                                </div>
+                            )}
                         </div>
 
-                        {/* Footer Hint */}
+                        {/* Footer Info & Instructions */}
                         <div className="mt-2 pt-2 border-t border-slate-100 dark:border-slate-800/60 flex items-center justify-between text-[11px] text-slate-500 dark:text-slate-400">
-                            <span className="italic">Move mouse away to close</span>
+                            <span className="italic flex items-center gap-1">
+                                💡 Move cursor into preview to scroll pages | Move cursor away to close
+                            </span>
                             {hoveredPreview.alternateLink && (
-                                <span className="font-semibold text-indigo-600 dark:text-indigo-400 flex items-center gap-1">
-                                    <ExternalLink className="w-3 h-3" /> Click thumbnail to open Drive
-                                </span>
+                                <a
+                                    href={hoveredPreview.alternateLink}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="font-semibold text-indigo-600 dark:text-indigo-400 hover:underline flex items-center gap-1"
+                                >
+                                    <ExternalLink className="w-3 h-3" /> Open in Google Drive
+                                </a>
                             )}
                         </div>
                     </div>
