@@ -3,7 +3,7 @@
 import { useSession } from "next-auth/react";
 import { useEffect, useState, useRef } from "react";
 import { usePathname, useRouter } from "next/navigation";
-import { ArrowLeft, User, FileText, Settings2, Sparkles, CheckCircle2, ListChecks, Download, RefreshCw, X, AlertTriangle, UploadCloud, Zap } from "lucide-react";
+import { ArrowLeft, User, FileText, Settings2, Sparkles, CheckCircle2, ListChecks, Download, RefreshCw, X, AlertTriangle, UploadCloud, Zap, ZoomIn, ExternalLink, Eye } from "lucide-react";
 import Papa from "papaparse";
 import stringSimilarity from "string-similarity";
 
@@ -48,7 +48,54 @@ export default function GradingWorkspace() {
     const [generateFeedback, setGenerateFeedback] = useState(false);
     const [pastExemplars, setPastExemplars] = useState([]);
 
-    // Batch Grading
+    // Hover Preview State for Attachments
+    const [hoveredPreview, setHoveredPreview] = useState(null);
+
+    const getHighResThumbnailUrl = (url) => {
+        if (!url) return "";
+        if (url.includes("=s")) {
+            return url.replace(/=s\d+/, "=s1200");
+        }
+        if (url.includes("=w")) {
+            return url.replace(/=w\d+-h\d+/, "=s1200");
+        }
+        return url + (url.includes("?") ? "&s=1200" : "=s1200");
+    };
+
+    const handleThumbnailMouseEnter = (e, att, studentName) => {
+        const rect = e.currentTarget.getBoundingClientRect();
+        const rawUrl = att.driveFile?.thumbnailUrl || att.thumbnailUrl;
+        if (!rawUrl) return;
+
+        const highRes = getHighResThumbnailUrl(rawUrl);
+
+        const previewWidth = 420;
+        const previewHeight = 360;
+
+        let left = rect.right + 12;
+        if (left + previewWidth > window.innerWidth - 20) {
+            left = Math.max(10, rect.left - previewWidth - 12);
+        }
+
+        let top = Math.max(16, rect.top - 40);
+        if (top + previewHeight > window.innerHeight - 20) {
+            top = Math.max(16, window.innerHeight - previewHeight - 20);
+        }
+
+        setHoveredPreview({
+            url: `/api/drive/thumbnail?url=${encodeURIComponent(rawUrl)}`,
+            highResUrl: `/api/drive/thumbnail?url=${encodeURIComponent(highRes)}`,
+            title: att.driveFile?.title || att.title || "Submission Attachment",
+            studentName: studentName || "Student Submission",
+            alternateLink: att.driveFile?.alternateLink || att.alternateLink,
+            x: left,
+            y: top
+        });
+    };
+
+    const handleThumbnailMouseLeave = () => {
+        setHoveredPreview(null);
+    };
     const [batchGrading, setBatchGrading] = useState(false);
     const [batchProgress, setBatchProgress] = useState({ current: 0, total: 0 });
     const [batchResults, setBatchResults] = useState({}); // { [submissionId]: { grade, feedback } }
@@ -1849,14 +1896,22 @@ export default function GradingWorkspace() {
                                     <div className="flex flex-wrap gap-2">
                                         {sub.assignmentSubmission?.attachments?.map((att, i) => (
                                             att.driveFile?.thumbnailUrl && (
-                                                <div key={i} className="flex-1 min-w-[30%] max-w-[80px] bg-slate-100 dark:bg-slate-800 rounded border border-slate-200 dark:border-slate-800 overflow-hidden shadow-sm aspect-video relative">
+                                                <div
+                                                    key={i}
+                                                    className="flex-1 min-w-[30%] max-w-[80px] bg-slate-100 dark:bg-slate-800 rounded border border-slate-200 dark:border-slate-800 overflow-hidden shadow-sm aspect-video relative group cursor-pointer hover:border-indigo-500 dark:hover:border-indigo-400 transition-all hover:shadow-md"
+                                                    onMouseEnter={(e) => handleThumbnailMouseEnter(e, att, getMaskedName(sub, submissions.findIndex(s => s.id === sub.id)))}
+                                                    onMouseLeave={handleThumbnailMouseLeave}
+                                                >
                                                     {att.driveFile?.alternateLink ? (
                                                         <a href={att.driveFile.alternateLink} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()}>
                                                             <img
                                                                 src={`/api/drive/thumbnail?url=${encodeURIComponent(att.driveFile.thumbnailUrl)}`}
                                                                 alt="Attachment Thumbnail"
-                                                                className="absolute inset-0 w-full h-full object-cover opacity-90 hover:opacity-100 transition-opacity"
+                                                                className="absolute inset-0 w-full h-full object-cover opacity-90 group-hover:opacity-100 group-hover:scale-105 transition-all"
                                                             />
+                                                            <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors flex items-center justify-center">
+                                                                <ZoomIn className="w-3.5 h-3.5 text-white opacity-0 group-hover:opacity-100 transition-opacity drop-shadow" />
+                                                            </div>
                                                         </a>
                                                     ) : (
                                                         <img
@@ -1892,6 +1947,60 @@ export default function GradingWorkspace() {
                                 <h3 className="text-lg font-bold border-b border-slate-100 dark:border-slate-800 pb-3 mb-4 flex justify-between items-center text-slate-900 dark:text-slate-50">
                                     {getMaskedName(selectedSubmission, submissions.findIndex(s => s.id === selectedSubmission.id))}'s Work
                                 </h3>
+
+                                {/* Main Workspace Attachments Bar */}
+                                {selectedSubmission?.assignmentSubmission?.attachments?.length > 0 && (
+                                    <div className="mb-4 p-3 bg-slate-50 dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800">
+                                        <div className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-2 flex items-center justify-between">
+                                            <span className="flex items-center gap-1.5">
+                                                <FileText className="w-3.5 h-3.5" />
+                                                Submitted Attachments ({selectedSubmission.assignmentSubmission.attachments.length})
+                                            </span>
+                                            <span className="text-[11px] font-medium normal-case text-indigo-600 dark:text-indigo-400 flex items-center gap-1">
+                                                <ZoomIn className="w-3 h-3" /> Hover thumbnail to enlarge preview
+                                            </span>
+                                        </div>
+                                        <div className="flex flex-wrap gap-3">
+                                            {selectedSubmission.assignmentSubmission.attachments.map((att, i) => (
+                                                <div 
+                                                    key={i} 
+                                                    className="flex items-center gap-3 p-2 bg-white dark:bg-slate-950 rounded-lg border border-slate-200 dark:border-slate-800 hover:border-indigo-400 dark:hover:border-indigo-500 transition-all shadow-sm group relative"
+                                                    onMouseEnter={(e) => handleThumbnailMouseEnter(e, att, getMaskedName(selectedSubmission, submissions.findIndex(s => s.id === selectedSubmission.id)))}
+                                                    onMouseLeave={handleThumbnailMouseLeave}
+                                                >
+                                                    {att.driveFile?.thumbnailUrl && (
+                                                        <div className="w-16 h-10 rounded overflow-hidden bg-slate-100 dark:bg-slate-800 relative flex-shrink-0 border border-slate-200 dark:border-slate-800 cursor-pointer">
+                                                            <img 
+                                                                src={`/api/drive/thumbnail?url=${encodeURIComponent(att.driveFile.thumbnailUrl)}`}
+                                                                alt={att.driveFile?.title || "Attachment"} 
+                                                                className="w-full h-full object-cover group-hover:scale-105 transition-transform"
+                                                            />
+                                                            <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors flex items-center justify-center">
+                                                                <ZoomIn className="w-3.5 h-3.5 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
+                                                            </div>
+                                                        </div>
+                                                    )}
+                                                    <div className="min-w-0 flex-1">
+                                                        <p className="text-xs font-semibold text-slate-800 dark:text-slate-200 truncate max-w-[220px]" title={att.driveFile?.title}>
+                                                            {att.driveFile?.title || "Attachment File"}
+                                                        </p>
+                                                        {att.driveFile?.alternateLink && (
+                                                            <a 
+                                                                href={att.driveFile.alternateLink} 
+                                                                target="_blank" 
+                                                                rel="noopener noreferrer" 
+                                                                className="text-[11px] text-indigo-600 dark:text-indigo-400 hover:underline flex items-center gap-1 mt-0.5"
+                                                                onClick={(e) => e.stopPropagation()}
+                                                            >
+                                                                <ExternalLink className="w-3 h-3" /> Open in Drive
+                                                            </a>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
 
                                 {contentLoading || grading ? (
                                     <div className="flex flex-col items-center gap-4 text-slate-500 dark:text-slate-400 justify-center p-8 bg-slate-50 dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 text-center">
@@ -2576,6 +2685,59 @@ export default function GradingWorkspace() {
                                     onChange={handleEdpuzzleCsvUpload}
                                 />
                             </label>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Floating Hover Magnified Preview Overlay */}
+            {hoveredPreview && (
+                <div 
+                    className="fixed z-50 pointer-events-none transition-all duration-150 ease-out"
+                    style={{
+                        left: `${hoveredPreview.x}px`,
+                        top: `${hoveredPreview.y}px`,
+                        width: '420px',
+                    }}
+                >
+                    <div className="bg-white dark:bg-slate-900 border-2 border-indigo-500/80 dark:border-indigo-400/80 rounded-2xl shadow-2xl p-3.5 backdrop-blur-md animate-in fade-in zoom-in-95 duration-150 overflow-hidden">
+                        {/* Header info */}
+                        <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-2 mb-2">
+                            <div className="min-w-0 pr-2">
+                                <span className="text-[10px] font-extrabold uppercase tracking-wider bg-indigo-100 text-indigo-800 dark:bg-indigo-900/60 dark:text-indigo-300 px-2 py-0.5 rounded-full">
+                                    {hoveredPreview.studentName}
+                                </span>
+                                <p className="text-xs font-bold text-slate-800 dark:text-slate-200 truncate mt-1">
+                                    {hoveredPreview.title}
+                                </p>
+                            </div>
+                            <span className="text-[10px] text-slate-500 dark:text-slate-400 font-medium flex items-center gap-1 bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded-md flex-shrink-0">
+                                <ZoomIn className="w-3 h-3 text-indigo-500" /> Hover Preview
+                            </span>
+                        </div>
+
+                        {/* High-res Image Preview */}
+                        <div className="relative rounded-xl overflow-hidden bg-slate-950 flex items-center justify-center min-h-[220px] max-h-[380px] shadow-inner border border-slate-200 dark:border-slate-800">
+                            <img
+                                src={hoveredPreview.highResUrl}
+                                alt={hoveredPreview.title}
+                                className="w-full h-full object-contain max-h-[360px] animate-in fade-in duration-200"
+                                onError={(e) => {
+                                    if (e.target.src !== hoveredPreview.url) {
+                                        e.target.src = hoveredPreview.url;
+                                    }
+                                }}
+                            />
+                        </div>
+
+                        {/* Footer Hint */}
+                        <div className="mt-2 pt-2 border-t border-slate-100 dark:border-slate-800/60 flex items-center justify-between text-[11px] text-slate-500 dark:text-slate-400">
+                            <span className="italic">Move mouse away to close</span>
+                            {hoveredPreview.alternateLink && (
+                                <span className="font-semibold text-indigo-600 dark:text-indigo-400 flex items-center gap-1">
+                                    <ExternalLink className="w-3 h-3" /> Click thumbnail to open Drive
+                                </span>
+                            )}
                         </div>
                     </div>
                 </div>
