@@ -75,6 +75,40 @@ export default function GradingWorkspace() {
         return url + (url.includes("?") ? "&s=1600" : "=s1600");
     };
 
+    const calculatePreviewPosition = (rect, currentSize = previewSize) => {
+        const previewWidth = currentSize === "large" ? 700 : 460;
+        const estimatedHeight = currentSize === "large" ? 640 : 540;
+        const viewportHeight = typeof window !== 'undefined' ? window.innerHeight : 900;
+        const viewportWidth = typeof window !== 'undefined' ? window.innerWidth : 1200;
+
+        // Horizontal position: default to right of target, fall back to left or centered
+        let left = rect ? rect.right + 12 : Math.round((viewportWidth - previewWidth) / 2);
+        if (rect && left + previewWidth > viewportWidth - 20) {
+            left = Math.max(10, rect.left - previewWidth - 12);
+        }
+
+        // Vertical position:
+        // Calculate a safe vertically-centered position in the viewport (upper-middle area)
+        const centeredTop = Math.max(20, Math.round((viewportHeight - estimatedHeight) / 2));
+
+        let top = rect ? Math.max(20, rect.top - 40) : centeredTop;
+
+        // If the hovered student card is far down the page (lower 40% of screen)
+        // OR if rect.top + estimatedHeight would push the preview below the viewport bottom,
+        // automatically position the preview in the upper/middle centered viewport area!
+        if (rect) {
+            if (rect.top > viewportHeight * 0.4 || top + estimatedHeight > viewportHeight - 30) {
+                top = centeredTop;
+            }
+        }
+
+        // Hard clamp so preview top is never < 20px and bottom never overflows viewport
+        const maxAllowedTop = Math.max(20, viewportHeight - estimatedHeight - 20);
+        top = Math.max(20, Math.min(top, maxAllowedTop));
+
+        return { left, top };
+    };
+
     const handleThumbnailMouseEnter = (e, att, studentName) => {
         if (leaveTimerRef.current) {
             clearTimeout(leaveTimerRef.current);
@@ -87,18 +121,7 @@ export default function GradingWorkspace() {
         const highRes = getHighResThumbnailUrl(rawUrl);
         const fileId = getDriveFileId(att);
 
-        const previewWidth = previewSize === "large" ? 700 : 460;
-        const previewHeight = 420;
-
-        let left = rect.right + 12;
-        if (left + previewWidth > window.innerWidth - 20) {
-            left = Math.max(10, rect.left - previewWidth - 12);
-        }
-
-        let top = Math.max(16, rect.top - 40);
-        if (top + previewHeight > window.innerHeight - 20) {
-            top = Math.max(16, window.innerHeight - previewHeight - 20);
-        }
+        const { left, top } = calculatePreviewPosition(rect, previewSize);
 
         setHoveredPreview({
             url: `/api/drive/thumbnail?url=${encodeURIComponent(rawUrl)}`,
@@ -108,6 +131,7 @@ export default function GradingWorkspace() {
             title: att.driveFile?.title || att.title || "Submission Attachment",
             studentName: studentName || "Student Submission",
             alternateLink: att.driveFile?.alternateLink || att.alternateLink,
+            rect: rect,
             x: left,
             y: top
         });
@@ -116,7 +140,7 @@ export default function GradingWorkspace() {
     const handleThumbnailMouseLeave = () => {
         leaveTimerRef.current = setTimeout(() => {
             setHoveredPreview(null);
-        }, 300);
+        }, 500); // 500ms grace period so moving cursor to centered preview is smooth and easy
     };
 
     const handlePopoverMouseEnter = () => {
@@ -128,6 +152,26 @@ export default function GradingWorkspace() {
     const handlePopoverMouseLeave = () => {
         setHoveredPreview(null);
     };
+
+    const handleTogglePreviewSize = () => {
+        const nextSize = previewSize === 'normal' ? 'large' : previewSize === 'large' ? 'fullscreen' : 'normal';
+        setPreviewSize(nextSize);
+        if (hoveredPreview && hoveredPreview.rect) {
+            const { left, top } = calculatePreviewPosition(hoveredPreview.rect, nextSize);
+            setHoveredPreview(prev => prev ? { ...prev, x: left, y: top } : null);
+        }
+    };
+
+    // Close preview on Escape key press
+    useEffect(() => {
+        const handleKeyDown = (e) => {
+            if (e.key === "Escape" && hoveredPreview) {
+                setHoveredPreview(null);
+            }
+        };
+        window.addEventListener("keydown", handleKeyDown);
+        return () => window.removeEventListener("keydown", handleKeyDown);
+    }, [hoveredPreview]);
     const [batchGrading, setBatchGrading] = useState(false);
     const [batchProgress, setBatchProgress] = useState({ current: 0, total: 0 });
     const [batchResults, setBatchResults] = useState({}); // { [submissionId]: { grade, feedback } }
@@ -2737,6 +2781,7 @@ export default function GradingWorkspace() {
                                   left: `${hoveredPreview.x}px`,
                                   top: `${hoveredPreview.y}px`,
                                   width: previewSize === 'large' ? '700px' : '460px',
+                                  maxHeight: 'calc(100vh - 40px)',
                               }
                     }
                     onMouseEnter={handlePopoverMouseEnter}
@@ -2820,7 +2865,7 @@ export default function GradingWorkspace() {
 
                                 {/* Size Toggle Buttons */}
                                 <button
-                                    onClick={() => setPreviewSize(s => s === 'normal' ? 'large' : s === 'large' ? 'fullscreen' : 'normal')}
+                                    onClick={handleTogglePreviewSize}
                                     className="px-2 py-1 text-[10px] font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 rounded flex items-center gap-1"
                                     title="Toggle Preview Window Size"
                                 >
