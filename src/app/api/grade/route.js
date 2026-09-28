@@ -22,7 +22,7 @@ export async function POST(request) {
         }
 
         const body = await request.json();
-        const { submissionText, rubric, strictness, studentId, studentNotes, rubricFile, studentFile, studentFiles, generateFeedback = false, maxPoints = 100, pastExemplars = [] } = body;
+        const { submissionText, rubric, strictness, studentId, studentNotes, rubricFile, studentFile, studentFiles, generateFeedback = false, maxPoints = 100, pastExemplars = [], learnedRules = [] } = body;
 
         if (!submissionText) {
             return NextResponse.json({ error: "No submission text provided" }, { status: 400 });
@@ -36,6 +36,12 @@ export async function POST(request) {
         const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
         const studentContext = studentNotes || "No specific instructions provided for this student.";
 
+        let learnedRulesSection = "";
+        if (Array.isArray(learnedRules) && learnedRules.length > 0) {
+            learnedRulesSection = `\n\n**TEACHER LEARNED RULES & DIRECT CORRECTIONS (MUST FOLLOW STRICTLY OVERWRITING GENERIC CRITERIA):**\nThe teacher has established explicit rules and grading corrections for this specific assignment across all their classes. YOU MUST FOLLOW THESE RULES WITH HIGHEST PRIORITY:\n` +
+            learnedRules.map((r, idx) => `[Learned Rule ${idx + 1}]: ${typeof r === 'string' ? r : r.ruleText}`).join("\n");
+        }
+
         let exemplarsSection = "";
         if (Array.isArray(pastExemplars) && pastExemplars.length > 0) {
             exemplarsSection = `\n\n**TEACHER MANUAL GRADE ADJUSTMENTS & EXEMPLARS FROM PREVIOUS STUDENTS/CLASSES:**\nThe teacher has previously reviewed and manually adjusted grades for this assignment. Use these actual teacher decisions to calibrate your strictness, partial credit decisions, and grading style:\n` +
@@ -48,6 +54,7 @@ You are an expert high school teacher grading an assignment. You will evaluate t
 
 **TEACHER INSTRUCTIONS / RUBRIC:**
 ${rubric || "No specific rubric provided. Evaluate for general high school level clarity, accuracy, and grammar."}
+${learnedRulesSection}
 ${exemplarsSection}
 
 **STUDENT CONTEXT (Keep this in mind for your feedback tone):**

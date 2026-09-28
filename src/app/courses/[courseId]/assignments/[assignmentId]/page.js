@@ -3,7 +3,7 @@
 import { useSession } from "next-auth/react";
 import { useEffect, useState, useRef } from "react";
 import { usePathname, useRouter } from "next/navigation";
-import { ArrowLeft, User, FileText, Settings2, Sparkles, CheckCircle2, ListChecks, Download, RefreshCw, X, AlertTriangle, UploadCloud, Zap, ZoomIn, ExternalLink, Eye, Maximize2, Minimize2, Plus, Minus, Image, Layers } from "lucide-react";
+import { ArrowLeft, User, FileText, Settings2, Sparkles, CheckCircle2, ListChecks, Download, RefreshCw, X, AlertTriangle, UploadCloud, Zap, ZoomIn, ExternalLink, Eye, Maximize2, Minimize2, Plus, Minus, Image, Layers, HelpCircle, MessageSquare, Trash2, Edit2, ChevronDown, ChevronUp, Check } from "lucide-react";
 import Papa from "papaparse";
 import stringSimilarity from "string-similarity";
 
@@ -327,6 +327,27 @@ export default function GradingWorkspace() {
     // Privacy Mode (Restricted)
     const [privacyMode, setPrivacyMode] = useState(false);
 
+    // Learned Rules across classes
+    const [learnedRules, setLearnedRules] = useState([]);
+    const [showLearnedRulesPanel, setShowLearnedRulesPanel] = useState(true);
+    const [newRuleInput, setNewRuleInput] = useState("");
+    const [editingRuleId, setEditingRuleId] = useState(null);
+    const [editingRuleText, setEditingRuleText] = useState("");
+
+    // Global Student Key across classes
+    const [carryKeyToAllClasses, setCarryKeyToAllClasses] = useState(true);
+    const [showKeyOverrideModal, setShowKeyOverrideModal] = useState(false);
+    const [pendingKeyStudentId, setPendingKeyStudentId] = useState("");
+    const [globalKeyActiveBanner, setGlobalKeyActiveBanner] = useState(null);
+
+    // AI Grade Explanation & Interactive Feedback Modal
+    const [showExplainModal, setShowExplainModal] = useState(false);
+    const [explainLoading, setExplainLoading] = useState(false);
+    const [explainText, setExplainText] = useState("");
+    const [teacherRuleInput, setTeacherRuleInput] = useState("");
+    const [savingRuleAndRegrading, setSavingRuleAndRegrading] = useState(false);
+    const [regradeSuccessMsg, setRegradeSuccessMsg] = useState("");
+
     useEffect(() => {
         if (status === "unauthenticated") {
             router.push("/");
@@ -382,6 +403,36 @@ export default function GradingWorkspace() {
                 if (savedEx) setPastExemplars(JSON.parse(savedEx));
             } catch (e) {
                 console.error("Failed to parse past exemplars", e);
+            }
+
+            // Load learned rules for this assignment title across classes
+            const rulesKey = `learned_rules_${assignmentName.toLowerCase().trim()}`;
+            try {
+                const savedRules = localStorage.getItem(rulesKey);
+                if (savedRules) setLearnedRules(JSON.parse(savedRules));
+            } catch (e) {
+                console.error("Failed to parse learned rules", e);
+            }
+
+            const savedShowRules = localStorage.getItem('pref_showLearnedRulesPanel');
+            if (savedShowRules !== null) setShowLearnedRulesPanel(savedShowRules === 'true');
+
+            // Load global master key for this assignment title if available
+            const masterKeyStorageKey = `master_key_${assignmentName.toLowerCase().trim()}`;
+            try {
+                const savedMasterKey = localStorage.getItem(masterKeyStorageKey);
+                if (savedMasterKey) {
+                    const parsedMasterKey = JSON.parse(savedMasterKey);
+                    if (parsedMasterKey && parsedMasterKey.applyToAllClasses) {
+                        setGlobalKeyActiveBanner(parsedMasterKey);
+                        if (parsedMasterKey.studentId) {
+                            setUseStudentAsKey(true);
+                            setKeyStudentId(parsedMasterKey.studentId);
+                        }
+                    }
+                }
+            } catch (e) {
+                console.error("Failed to load global master key", e);
             }
         }
     }, [assignmentName]);
@@ -541,6 +592,238 @@ export default function GradingWorkspace() {
         if (exemplars.length > 8) exemplars = exemplars.slice(0, 8);
         localStorage.setItem(exemplarKey, JSON.stringify(exemplars));
         setPastExemplars(exemplars);
+    };
+
+    // Learned Rules Management Helpers
+    const saveLearnedRules = (updated) => {
+        setLearnedRules(updated);
+        if (assignmentName) {
+            const rulesKey = `learned_rules_${assignmentName.toLowerCase().trim()}`;
+            localStorage.setItem(rulesKey, JSON.stringify(updated));
+        }
+    };
+
+    const handleAddLearnedRule = () => {
+        if (!newRuleInput.trim()) return;
+        const updated = [...learnedRules, { id: Date.now().toString(), ruleText: newRuleInput.trim(), timestamp: Date.now() }];
+        saveLearnedRules(updated);
+        setNewRuleInput("");
+    };
+
+    const handleDeleteLearnedRule = (idToDelete) => {
+        const updated = learnedRules.filter(r => (typeof r === 'string' ? r !== idToDelete : r.id !== idToDelete));
+        saveLearnedRules(updated);
+    };
+
+    const handleEditLearnedRule = (id, newText) => {
+        const updated = learnedRules.map(r => {
+            if (typeof r === 'string') return r === id ? newText : r;
+            return r.id === id ? { ...r, ruleText: newText } : r;
+        });
+        saveLearnedRules(updated);
+        setEditingRuleId(null);
+        setEditingRuleText("");
+    };
+
+    // Student Key Selection & Cross-Class Override Logic
+    const handleSelectStudentKey = (selectedId) => {
+        if (!selectedId) return;
+        const masterKeyStorageKey = `master_key_${assignmentName.toLowerCase().trim()}`;
+        const existingMasterKey = localStorage.getItem(masterKeyStorageKey);
+
+        if (existingMasterKey && carryKeyToAllClasses) {
+            try {
+                const parsed = JSON.parse(existingMasterKey);
+                if (parsed.studentId !== selectedId) {
+                    setPendingKeyStudentId(selectedId);
+                    setShowKeyOverrideModal(true);
+                    return;
+                }
+            } catch (e) {}
+        }
+        confirmAndApplyKey(selectedId);
+    };
+
+    const confirmAndApplyKey = (selectedId) => {
+        setKeyStudentId(selectedId);
+        setShowKeyOverrideModal(false);
+        setPendingKeyStudentId("");
+
+        if (assignmentName && selectedId) {
+            const keySub = submissions.find(s => s.userId === selectedId);
+            const studentName = getMaskedName(keySub, submissions.findIndex(s => s.id === keySub?.id));
+            const masterKeyStorageKey = `master_key_${assignmentName.toLowerCase().trim()}`;
+
+            const cachedDoc = submissionCacheRef.current[keySub?.id];
+            let keyText = cachedDoc?.data || cachedDoc?.content || "";
+            let runtimeRubric = `Use the following student submission as the perfect 100% Answer Key. Every other student must be graded strictly against how well their answers match this master student's answers.\n\nAdditional Instructions from Teacher:\n${rubric}\n\n[MASTER STUDENT TEXT]:\n\n` + keyText;
+            let runtimeRubricFile = (cachedDoc?.isBinary && cachedDoc?.data) ? { data: cachedDoc.data, mimeType: cachedDoc.mimeType } : null;
+
+            const masterKeyObj = {
+                studentId: selectedId,
+                studentName: studentName,
+                sourceCourseId: courseId,
+                sourceAssignmentId: assignmentId,
+                runtimeRubric: runtimeRubric,
+                runtimeRubricFile: runtimeRubricFile,
+                applyToAllClasses: carryKeyToAllClasses,
+                updatedAt: Date.now()
+            };
+
+            if (carryKeyToAllClasses) {
+                localStorage.setItem(masterKeyStorageKey, JSON.stringify(masterKeyObj));
+                setGlobalKeyActiveBanner(masterKeyObj);
+            }
+        }
+    };
+
+    // AI Grade Rationale & Interactive Feedback Modal Handlers
+    const handleOpenExplainModal = async () => {
+        if (!selectedSubmission || !aiFeedback) return;
+        setShowExplainModal(true);
+        setExplainLoading(true);
+        setExplainText("");
+        setRegradeSuccessMsg("");
+        setTeacherRuleInput("");
+
+        try {
+            let submissionTextOnly = submissionContent;
+            if (multipleBinaries && multipleBinaries.length > 0) {
+                submissionTextOnly = submissionContent ? submissionContent + "\n\nSee attached files." : "See attached student files.";
+            } else if (submissionIsBinary && submissionContent) {
+                submissionTextOnly = "See attached student file.";
+            }
+
+            const studentName = getMaskedName(selectedSubmission, submissions.findIndex(s => s.id === selectedSubmission.id));
+
+            const res = await fetch('/api/grade/explain', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    submissionText: submissionTextOnly,
+                    rubric: rubric,
+                    assignedGrade: aiFeedback.grade,
+                    feedback: aiFeedback.feedback,
+                    studentName: studentName,
+                    studentNotes: studentNotes,
+                    maxPoints: assignmentInfo?.maxPoints || 100,
+                    learnedRules: learnedRules
+                })
+            });
+
+            const data = await res.json();
+            if (res.ok && data.explanation) {
+                setExplainText(data.explanation);
+            } else {
+                setExplainText("Could not generate AI explanation. " + (data.error || ""));
+            }
+        } catch (e) {
+            console.error("Explain grade error:", e);
+            setExplainText("An error occurred while asking the AI to explain this grade.");
+        } finally {
+            setExplainLoading(false);
+        }
+    };
+
+    const handleSaveRuleAndRegrade = async () => {
+        if (!teacherRuleInput.trim() || !selectedSubmission) return;
+        setSavingRuleAndRegrading(true);
+        setRegradeSuccessMsg("");
+
+        try {
+            const newRuleText = teacherRuleInput.trim();
+            const updatedRules = [...learnedRules, { id: Date.now().toString(), ruleText: newRuleText, timestamp: Date.now() }];
+            saveLearnedRules(updatedRules);
+
+            // Re-grade the current student immediately
+            let inlineDataContent = null;
+            let inlineDataFilesForAI = [];
+            let submissionTextOnly = submissionContent;
+
+            if (multipleBinaries && multipleBinaries.length > 0) {
+                submissionTextOnly = submissionContent ? submissionContent + "\n\nSee attached files." : "See attached student files.";
+                inlineDataFilesForAI = multipleBinaries.map(mb => ({ data: mb.data, mimeType: mb.mimeType }));
+            } else if (submissionIsBinary && submissionContent) {
+                submissionTextOnly = "See attached student file.";
+                inlineDataContent = { data: submissionContent, mimeType: submissionMime };
+            }
+
+            let runtimeRubric = rubric;
+            let runtimeRubricFile = rubricFile ? { data: rubricFile.base64.split(",")[1], mimeType: rubricFile.mimeType } : null;
+
+            if (useStudentAsKey && keyStudentId) {
+                if (masterKeyCacheRef.current[keyStudentId]) {
+                    runtimeRubric = masterKeyCacheRef.current[keyStudentId].runtimeRubric;
+                    runtimeRubricFile = masterKeyCacheRef.current[keyStudentId].runtimeRubricFile;
+                }
+            }
+
+            const res = await fetch('/api/grade', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    rubric: runtimeRubric,
+                    strictness: strictness,
+                    submissionText: submissionTextOnly,
+                    studentId: selectedSubmission.userId,
+                    studentNotes: studentNotes,
+                    studentFile: inlineDataContent,
+                    studentFiles: inlineDataFilesForAI,
+                    rubricFile: runtimeRubricFile,
+                    generateFeedback: generateFeedback,
+                    maxPoints: assignmentInfo?.maxPoints || 100,
+                    pastExemplars: pastExemplars,
+                    learnedRules: updatedRules
+                })
+            });
+
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error || "Re-grading failed.");
+
+            let rawGrade = String(data.grade || "N/A");
+            let finalGradeCalculated = rawGrade.replace(/[^\d.]/g, '').trim() || rawGrade;
+
+            const newResultObj = {
+                grade: finalGradeCalculated,
+                feedback: data.feedback || "Re-graded after rule update.",
+                confidence: data.confidence || "high"
+            };
+
+            setAiFeedback(newResultObj);
+            setBatchResults(prev => ({
+                ...prev,
+                [selectedSubmission.id]: newResultObj
+            }));
+
+            setRegradeSuccessMsg(`Grade updated to ${finalGradeCalculated}/${assignmentInfo?.maxPoints || 100}! Rule learned across all classes.`);
+            setTeacherRuleInput("");
+
+            // Re-fetch explanation for updated grade
+            const studentName = getMaskedName(selectedSubmission, submissions.findIndex(s => s.id === selectedSubmission.id));
+            const explainRes = await fetch('/api/grade/explain', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    submissionText: submissionTextOnly,
+                    rubric: runtimeRubric,
+                    assignedGrade: finalGradeCalculated,
+                    feedback: newResultObj.feedback,
+                    studentName: studentName,
+                    studentNotes: studentNotes,
+                    maxPoints: assignmentInfo?.maxPoints || 100,
+                    learnedRules: updatedRules
+                })
+            });
+            const explainData = await explainRes.json();
+            if (explainRes.ok && explainData.explanation) {
+                setExplainText(explainData.explanation);
+            }
+        } catch (err) {
+            console.error("Rule save & regrade error:", err);
+            alert("Failed to re-grade student: " + err.message);
+        } finally {
+            setSavingRuleAndRegrading(false);
+        }
     };
 
     // EdPuzzle: Import grades directly from Classroom's assignedGrade / draftGrade field
@@ -899,7 +1182,8 @@ export default function GradingWorkspace() {
                     rubricFile: runtimeRubricFile,
                     generateFeedback: generateFeedback,
                     maxPoints: assignmentInfo?.maxPoints || 100,
-                    pastExemplars: pastExemplars
+                    pastExemplars: pastExemplars,
+                    learnedRules: learnedRules
                 })
             });
 
@@ -1500,7 +1784,8 @@ export default function GradingWorkspace() {
                                 rubricFile: baselineRubricFile,
                                 generateFeedback: generateFeedback,
                                 maxPoints: assignmentInfo?.maxPoints || 100,
-                                pastExemplars: pastExemplars
+                                pastExemplars: pastExemplars,
+                                learnedRules: learnedRules
                             })
                         });
                         
@@ -2239,6 +2524,100 @@ export default function GradingWorkspace() {
                                         </div>
                                     </div>
 
+                                    {/* Learned Assignment Rules Panel across Classes */}
+                                    <div className="bg-indigo-50/50 dark:bg-indigo-950/30 border border-indigo-100 dark:border-indigo-900/50 rounded-xl p-4 mb-4">
+                                        <div className="flex items-center justify-between">
+                                            <div className="flex items-center gap-2">
+                                                <Sparkles className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
+                                                <h4 className="text-xs font-bold text-indigo-900 dark:text-indigo-200 uppercase tracking-wider">
+                                                    Learned Rules for "{assignmentName || 'This Assignment'}" ({learnedRules.length})
+                                                </h4>
+                                                {learnedRules.length > 0 && (
+                                                    <span className="text-[10px] font-bold bg-indigo-200 dark:bg-indigo-800 text-indigo-800 dark:text-indigo-200 px-2 py-0.5 rounded-full">
+                                                        Active Across All Sections
+                                                    </span>
+                                                )}
+                                            </div>
+                                            <button
+                                                onClick={() => setShowLearnedRulesPanel(!showLearnedRulesPanel)}
+                                                className="text-xs text-indigo-600 dark:text-indigo-400 font-bold hover:underline flex items-center gap-1"
+                                            >
+                                                {showLearnedRulesPanel ? <><ChevronUp className="w-3.5 h-3.5" /> Hide</> : <><ChevronDown className="w-3.5 h-3.5" /> Show ({learnedRules.length})</>}
+                                            </button>
+                                        </div>
+
+                                        {showLearnedRulesPanel && (
+                                            <div className="mt-3 space-y-2">
+                                                {learnedRules.length === 0 ? (
+                                                    <p className="text-xs text-slate-500 dark:text-slate-400 italic">No custom grading rules learned yet. Click "Why this grade?" on any student result to teach the AI explicit rules!</p>
+                                                ) : (
+                                                    <div className="space-y-1.5 max-h-44 overflow-y-auto pr-1">
+                                                        {learnedRules.map((rule, idx) => {
+                                                            const ruleId = typeof rule === 'string' ? rule : rule.id;
+                                                            const ruleText = typeof rule === 'string' ? rule : rule.ruleText;
+                                                            const isEditing = editingRuleId === ruleId;
+
+                                                            return (
+                                                                <div key={ruleId || idx} className="flex items-center justify-between gap-2 p-2 bg-white dark:bg-slate-900 rounded-lg border border-indigo-100 dark:border-indigo-800/60 text-xs text-slate-800 dark:text-slate-200 shadow-sm">
+                                                                    {isEditing ? (
+                                                                        <div className="flex-1 flex gap-2">
+                                                                            <input
+                                                                                type="text"
+                                                                                value={editingRuleText}
+                                                                                onChange={(e) => setEditingRuleText(e.target.value)}
+                                                                                className="flex-1 px-2 py-1 border border-indigo-300 rounded text-xs outline-none bg-white dark:bg-slate-950"
+                                                                            />
+                                                                            <button onClick={() => handleEditLearnedRule(ruleId, editingRuleText)} className="text-emerald-600 font-bold px-2 py-1 bg-emerald-50 rounded">Save</button>
+                                                                            <button onClick={() => setEditingRuleId(null)} className="text-slate-400 px-2 py-1">Cancel</button>
+                                                                        </div>
+                                                                    ) : (
+                                                                        <>
+                                                                            <span className="flex-1 font-medium"><span className="text-indigo-600 font-bold mr-1">#{idx + 1}</span> {ruleText}</span>
+                                                                            <div className="flex items-center gap-1">
+                                                                                <button
+                                                                                    onClick={() => { setEditingRuleId(ruleId); setEditingRuleText(ruleText); }}
+                                                                                    className="p-1 text-slate-400 hover:text-indigo-600 transition-colors"
+                                                                                    title="Edit Rule"
+                                                                                >
+                                                                                    <Edit2 className="w-3.5 h-3.5" />
+                                                                                </button>
+                                                                                <button
+                                                                                    onClick={() => handleDeleteLearnedRule(ruleId)}
+                                                                                    className="p-1 text-slate-400 hover:text-red-600 transition-colors"
+                                                                                    title="Delete Rule"
+                                                                                >
+                                                                                    <Trash2 className="w-3.5 h-3.5" />
+                                                                                </button>
+                                                                            </div>
+                                                                        </>
+                                                                    )}
+                                                                </div>
+                                                            );
+                                                        })}
+                                                    </div>
+                                                )}
+
+                                                <div className="flex gap-2 pt-1">
+                                                    <input
+                                                        type="text"
+                                                        value={newRuleInput}
+                                                        onChange={(e) => setNewRuleInput(e.target.value)}
+                                                        onKeyDown={(e) => { if (e.key === 'Enter') handleAddLearnedRule(); }}
+                                                        placeholder="Add a new custom grading rule manually..."
+                                                        className="flex-1 p-2 text-xs border border-indigo-200 dark:border-indigo-800 rounded-lg outline-none bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-200 focus:ring-1 focus:ring-indigo-500"
+                                                    />
+                                                    <button
+                                                        onClick={handleAddLearnedRule}
+                                                        disabled={!newRuleInput.trim()}
+                                                        className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-bold transition-all disabled:opacity-50"
+                                                    >
+                                                        + Add Rule
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+
                                     <div>
                                         <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
                                             <div className="flex items-center gap-2">
@@ -2336,21 +2715,38 @@ export default function GradingWorkspace() {
                                         </div>
 
                                         {useStudentAsKey && (
-                                            <div className="bg-indigo-50 dark:bg-indigo-900/20 p-4 rounded-xl border border-indigo-100 dark:border-indigo-800 mt-2 mb-4">
-                                                <label className="block text-xs font-bold text-indigo-800 dark:text-indigo-300 mb-2 uppercase tracking-wide">Select Master Student</label>
+                                            <div className="bg-indigo-50 dark:bg-indigo-900/20 p-4 rounded-xl border border-indigo-100 dark:border-indigo-800 mt-2 mb-4 space-y-3">
+                                                {globalKeyActiveBanner && (
+                                                    <div className="bg-indigo-100/80 dark:bg-indigo-900/60 border border-indigo-200 dark:border-indigo-700 text-indigo-900 dark:text-indigo-200 px-3 py-2 rounded-lg text-xs font-bold flex items-center justify-between">
+                                                        <span>🌐 Active Master Key: <span className="underline">{globalKeyActiveBanner.studentName}</span> (Carried across all classes for "{assignmentName}")</span>
+                                                        <span className="text-[10px] bg-indigo-200 dark:bg-indigo-800 px-2 py-0.5 rounded">All Periods</span>
+                                                    </div>
+                                                )}
+                                                <div className="flex justify-between items-center">
+                                                    <label className="block text-xs font-bold text-indigo-800 dark:text-indigo-300 uppercase tracking-wide">Select Master Student</label>
+                                                    <label className="flex items-center gap-1.5 text-xs font-bold text-indigo-700 dark:text-indigo-300 cursor-pointer">
+                                                        <input
+                                                            type="checkbox"
+                                                            checked={carryKeyToAllClasses}
+                                                            onChange={(e) => setCarryKeyToAllClasses(e.target.checked)}
+                                                            className="w-3.5 h-3.5 text-indigo-600 rounded"
+                                                        />
+                                                        Carry key to all classes with this assignment name
+                                                    </label>
+                                                </div>
                                                 <select
                                                     value={keyStudentId}
-                                                    onChange={(e) => setKeyStudentId(e.target.value)}
+                                                    onChange={(e) => handleSelectStudentKey(e.target.value)}
                                                     className="w-full p-2.5 text-sm font-semibold border-2 border-indigo-200 dark:border-indigo-700 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-200 shadow-sm"
                                                 >
                                                     <option value="" disabled>-- Select a student who got 100% --</option>
                                                     {submissions.map(sub => (
                                                         <option key={sub.userId} value={sub.userId}>
-                                                            {sub.studentProfile?.name?.fullName || sub.userId}
+                                                            {getMaskedName(sub, submissions.findIndex(s => s.id === sub.id))}
                                                         </option>
                                                     ))}
                                                 </select>
-                                                <p className="text-xs text-indigo-600 dark:text-indigo-400 mt-2">Every other student will be graded based on how closely their answers match this selected student's work.</p>
+                                                <p className="text-xs text-indigo-600 dark:text-indigo-400">Every other student will be graded based on how closely their answers match this selected student's work.</p>
                                             </div>
                                         )}
                                         <textarea
@@ -2478,11 +2874,20 @@ export default function GradingWorkspace() {
                                                 <CheckCircle2 className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
                                                 AI Evaluation Result
                                             </div>
-                                            {aiFeedback.confidence === "low" && (
-                                                <span className="text-xs font-bold bg-amber-100 text-amber-900 dark:bg-amber-900/60 dark:text-amber-200 px-2.5 py-1 rounded-full border border-amber-300 dark:border-amber-700 flex items-center gap-1 shadow-sm">
-                                                    🔍 Low AI Confidence (Teacher Review Suggested)
-                                                </span>
-                                            )}
+                                            <div className="flex items-center gap-2 flex-wrap">
+                                                <button
+                                                    onClick={handleOpenExplainModal}
+                                                    className="text-xs bg-indigo-600 hover:bg-indigo-700 text-white font-bold px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition-all shadow-sm hover:shadow active:scale-95 cursor-pointer"
+                                                    title="Ask AI to explain step-by-step why it gave this score and teach it new rules"
+                                                >
+                                                    <HelpCircle className="w-4 h-4 text-indigo-200" /> Why this grade? (Ask AI)
+                                                </button>
+                                                {aiFeedback.confidence === "low" && (
+                                                    <span className="text-xs font-bold bg-amber-100 text-amber-900 dark:bg-amber-900/60 dark:text-amber-200 px-2.5 py-1 rounded-full border border-amber-300 dark:border-amber-700 flex items-center gap-1 shadow-sm">
+                                                        🔍 Low AI Confidence (Teacher Review Suggested)
+                                                    </span>
+                                                )}
+                                            </div>
                                         </h3>
                                     </div>
 
@@ -2926,6 +3331,132 @@ export default function GradingWorkspace() {
                                     <ExternalLink className="w-3 h-3" /> Open in Google Drive
                                 </a>
                             )}
+                        </div>
+                    </div>
+                </div>
+            )}
+            {/* Master Key Override Confirmation Modal */}
+            {showKeyOverrideModal && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm animate-in fade-in duration-200">
+                    <div className="bg-white dark:bg-slate-950 rounded-2xl shadow-2xl w-full max-w-md overflow-hidden border border-slate-200 dark:border-slate-800 animate-in zoom-in-95 duration-200">
+                        <div className="px-6 py-4 border-b border-slate-200 dark:border-slate-800 flex justify-between items-center bg-indigo-50/50 dark:bg-indigo-900/30">
+                            <h2 className="text-lg font-bold text-indigo-900 dark:text-indigo-300 flex items-center gap-2">
+                                <AlertTriangle className="w-5 h-5 text-amber-500" />
+                                Override Master Key Across Classes?
+                            </h2>
+                            <button onClick={() => setShowKeyOverrideModal(false)} className="text-slate-400 hover:text-slate-600 dark:text-slate-300 p-1 rounded-lg">
+                                <X className="w-5 h-5" />
+                            </button>
+                        </div>
+                        <div className="p-6 space-y-4 text-sm text-slate-700 dark:text-slate-300">
+                            <p>
+                                A Master Answer Key is currently active for <strong>"{assignmentName}"</strong> across all your class sections.
+                            </p>
+                            <div className="p-3 bg-amber-50 dark:bg-amber-900/30 border border-amber-200 dark:border-amber-800 rounded-xl text-amber-900 dark:text-amber-200 text-xs font-semibold">
+                                Selecting a new student key will <strong>override and replace</strong> the Master Answer Key for all classes sharing the assignment title "{assignmentName}".
+                            </div>
+                            <p>Do you want to proceed with updating the Master Key across all sections?</p>
+                            <div className="flex gap-3 pt-2">
+                                <button
+                                    onClick={() => confirmAndApplyKey(pendingKeyStudentId)}
+                                    className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white py-2.5 px-4 rounded-xl font-bold transition-all shadow-sm"
+                                >
+                                    Confirm & Override Key
+                                </button>
+                                <button
+                                    onClick={() => { setShowKeyOverrideModal(false); setPendingKeyStudentId(""); }}
+                                    className="px-4 py-2.5 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 rounded-xl font-bold hover:bg-slate-200 transition-colors"
+                                >
+                                    Cancel
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* AI Grade Rationale & Interactive Feedback Modal */}
+            {showExplainModal && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
+                    <div className="bg-white dark:bg-slate-950 rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col overflow-hidden border border-slate-200 dark:border-slate-800 animate-in zoom-in-95 duration-200">
+                        <div className="px-6 py-4 border-b border-slate-200 dark:border-slate-800 flex justify-between items-center bg-indigo-600 text-white">
+                            <div className="flex items-center gap-2">
+                                <Sparkles className="w-5 h-5 text-indigo-200" />
+                                <div>
+                                    <h2 className="text-base font-bold leading-none">AI Grading Rationale & Learning</h2>
+                                    <p className="text-xs text-indigo-200 mt-0.5">
+                                        {getMaskedName(selectedSubmission, submissions.findIndex(s => s.id === selectedSubmission?.id))} — Score: {aiFeedback?.grade}/{assignmentInfo?.maxPoints || 100}
+                                    </p>
+                                </div>
+                            </div>
+                            <button onClick={() => setShowExplainModal(false)} className="text-indigo-200 hover:text-white p-1 rounded-lg transition-colors">
+                                <X className="w-5 h-5" />
+                            </button>
+                        </div>
+
+                        <div className="p-6 overflow-y-auto space-y-6 flex-1 text-sm text-slate-800 dark:text-slate-200">
+                            {explainLoading ? (
+                                <div className="flex flex-col items-center justify-center py-12 gap-3 text-slate-500">
+                                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
+                                    <p className="font-semibold text-sm">Asking AI for step-by-step breakdown...</p>
+                                </div>
+                            ) : (
+                                <div className="space-y-4">
+                                    <div className="p-4 bg-indigo-50/70 dark:bg-indigo-950/40 rounded-xl border border-indigo-100 dark:border-indigo-900/60">
+                                        <h3 className="text-xs font-bold text-indigo-900 dark:text-indigo-200 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                                            <HelpCircle className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
+                                            AI Step-by-Step Rationale:
+                                        </h3>
+                                        <div className="text-sm whitespace-pre-wrap leading-relaxed font-sans text-slate-800 dark:text-slate-200">
+                                            {explainText}
+                                        </div>
+                                    </div>
+
+                                    {regradeSuccessMsg && (
+                                        <div className="p-3 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 rounded-xl text-emerald-900 dark:text-emerald-200 text-xs font-bold flex items-center gap-2 animate-in fade-in duration-200">
+                                            <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                                            {regradeSuccessMsg}
+                                        </div>
+                                    )}
+
+                                    <div className="bg-slate-50 dark:bg-slate-900 p-4 rounded-xl border border-slate-200 dark:border-slate-800 space-y-3">
+                                        <h4 className="font-bold text-slate-900 dark:text-slate-100 text-sm flex items-center gap-1.5">
+                                            <MessageSquare className="w-4 h-4 text-indigo-600" />
+                                            Teach AI / Correct Grading for this Assignment
+                                        </h4>
+                                        <p className="text-xs text-slate-500 dark:text-slate-400">
+                                            Write back to the AI explaining why it should or shouldn't grade like that (e.g. <em>"Question 2 is correct because 'cell wall' and 'membrane' are synonymous here"</em>). This rule will be learned across all 4 of your classes for this assignment!
+                                        </p>
+                                        <textarea
+                                            value={teacherRuleInput}
+                                            onChange={(e) => setTeacherRuleInput(e.target.value)}
+                                            placeholder="Explain why the grade should be adjusted or what the AI got wrong..."
+                                            className="w-full h-24 p-3 text-sm border border-slate-200 dark:border-slate-800 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 bg-white dark:bg-slate-950 text-slate-800 dark:text-slate-200 placeholder:text-slate-400 resize-y"
+                                        ></textarea>
+                                        <div className="flex justify-end gap-3">
+                                            <button
+                                                onClick={handleSaveRuleAndRegrade}
+                                                disabled={savingRuleAndRegrading || !teacherRuleInput.trim()}
+                                                className="bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2.5 rounded-xl font-bold text-xs flex items-center gap-2 transition-all disabled:opacity-50 shadow-sm active:scale-95"
+                                            >
+                                                {savingRuleAndRegrading ? (
+                                                    <><div className="animate-spin rounded-full h-3.5 w-3.5 border-b-2 border-white"></div> Learning Rule & Re-grading...</>
+                                                ) : (
+                                                    <><Sparkles className="w-4 h-4" /> Save Rule & Re-grade Now</>
+                                                )}
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                        <div className="px-6 py-3 bg-slate-50 dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800 flex justify-end">
+                            <button
+                                onClick={() => setShowExplainModal(false)}
+                                className="px-4 py-2 bg-slate-200 dark:bg-slate-800 hover:bg-slate-300 text-slate-800 dark:text-slate-200 rounded-xl font-bold text-xs transition-colors"
+                            >
+                                Close
+                            </button>
                         </div>
                     </div>
                 </div>
