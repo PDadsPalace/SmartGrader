@@ -1,4 +1,5 @@
 import { google } from "googleapis";
+import sharp from "sharp";
 
 // Initialize the Google Drive client using an OAuth2 access token
 export function getDriveClient(accessToken) {
@@ -49,7 +50,7 @@ export async function exportGoogleDocToText(accessToken, fileId) {
             const chunks = [];
             response.data
                 .on('data', chunk => { chunks.push(chunk); })
-                .on('end', () => {
+                .on('end', async () => {
                     const buffer = Buffer.concat(chunks);
                     const isBinary = !finalMimeType.startsWith('text/') && finalMimeType !== 'application/rtf';
 
@@ -62,13 +63,33 @@ export async function exportGoogleDocToText(accessToken, fileId) {
                             mimeType: 'text/plain',
                             isBinary: false
                         });
-                    } else {
-                        resolve({
-                            data: isBinary ? buffer.toString('base64') : buffer.toString('utf-8'),
-                            mimeType: finalMimeType,
-                            isBinary: isBinary
-                        });
+                        return;
                     }
+
+                    // Compress student image attachments using sharp to stay under Vercel payload limits & Gemini quota limits
+                    if (finalMimeType.startsWith('image/')) {
+                        try {
+                            const compressedBuffer = await sharp(buffer)
+                                .resize({ width: 1400, height: 1400, fit: 'inside', withoutEnlargement: true })
+                                .jpeg({ quality: 80 })
+                                .toBuffer();
+
+                            resolve({
+                                data: compressedBuffer.toString('base64'),
+                                mimeType: 'image/jpeg',
+                                isBinary: true
+                            });
+                            return;
+                        } catch (imgErr) {
+                            console.warn("Sharp image compression fallback:", imgErr.message);
+                        }
+                    }
+
+                    resolve({
+                        data: isBinary ? buffer.toString('base64') : buffer.toString('utf-8'),
+                        mimeType: finalMimeType,
+                        isBinary: isBinary
+                    });
                 })
                 .on('error', err => {
                     console.error("Error streaming Google Drive file:", err);
