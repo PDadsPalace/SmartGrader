@@ -1609,8 +1609,8 @@ export default function GradingWorkspace() {
         const totalToProcess = submissions.length;
 
         // Sliding Window Concurrency Pool
-        // We will process up to 6 students simultaneously, starting a new one the exact moment one finishes.
-        const MAX_CONCURRENT = 6;
+        // We will process up to 3 students simultaneously to respect Gemini API rate limits on multi-image attachments
+        const MAX_CONCURRENT = 3;
         let currentIndex = 0;
 
         const processSubmission = async (sub) => {
@@ -1798,14 +1798,15 @@ export default function GradingWorkspace() {
                         });
                         
                         if (!res.ok && (res.status === 429 || res.status === 504 || res.status >= 500)) {
-                            if (retryCount < 3) {
-                                const waitTime = Math.pow(2, retryCount + 1) * 1000; // 2s, 4s, 8s
-                                console.warn(`API returned ${res.status} for ${sub.userId}. Retrying in ${waitTime}ms... (${retryCount + 1}/3)`);
+                            if (retryCount < 4) {
+                                const backoffDelays = [3000, 6000, 10000, 15000];
+                                const waitTime = backoffDelays[retryCount] || 15000;
+                                console.warn(`API returned ${res.status} for ${sub.userId}. Retrying in ${waitTime}ms... (${retryCount + 1}/4)`);
                                 
                                 // Update UI so it doesn't look hung!
                                 setBatchResults(prev => ({ 
                                     ...prev, 
-                                    [sub.id]: { grade: "Retrying", feedback: `API Timeout or Rate Limit (${res.status}). Waiting ${waitTime/1000}s and trying again (${retryCount + 1}/3)...` } 
+                                    [sub.id]: { grade: "Retrying", feedback: `API Rate Limit or Busy (${res.status}). Waiting ${waitTime/1000}s and trying again (${retryCount + 1}/4)...` } 
                                 }));
                                 
                                 await new Promise(resolve => setTimeout(resolve, waitTime));
@@ -1911,7 +1912,10 @@ export default function GradingWorkspace() {
                 }
         };
 
-        const workers = Array(MAX_CONCURRENT).fill(null).map(async () => {
+        const workers = Array(MAX_CONCURRENT).fill(null).map(async (_, idx) => {
+            if (idx > 0) {
+                await new Promise(r => setTimeout(r, idx * 600));
+            }
             while (currentIndex < submissions.length && !stopGradingRef.current) {
                 const sub = submissions[currentIndex++];
                 await processSubmission(sub);

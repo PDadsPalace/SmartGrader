@@ -165,12 +165,13 @@ CRITICAL REMINDER: Look closely at the student's file and text. If both are comp
             required: ["suggested_grade"]
         };
 
-        // Call Gemini 2.5 Flash with Retry Logic (Bulletproof Form Feature)
+        // Call Gemini 2.5 Flash with Robust Exponential Backoff Retry Logic
         let response;
         let retries = 0;
+        const maxRetries = 4;
         let lastError;
         
-        while (retries < 2) {
+        while (retries < maxRetries) {
             try {
                 response = await ai.models.generateContent({
                     model: 'gemini-2.5-flash',
@@ -186,10 +187,10 @@ CRITICAL REMINDER: Look closely at the student's file and text. If both are comp
             } catch (apiErr) {
                 lastError = apiErr;
                 retries++;
-                console.log(`Gemini API call failed (Attempt ${retries}). Retrying...`, apiErr.message);
-                if (retries >= 2) throw lastError;
-                // Wait 1 second before retry to allow rate limits to cool down
-                await new Promise(resolve => setTimeout(resolve, 1000));
+                const backoffMs = Math.pow(2, retries) * 1000; // 2s, 4s, 8s, 16s
+                console.log(`Gemini API call failed (Attempt ${retries}/${maxRetries}). Retrying in ${backoffMs}ms...`, apiErr.message);
+                if (retries >= maxRetries) throw lastError;
+                await new Promise(resolve => setTimeout(resolve, backoffMs));
             }
         }
 
