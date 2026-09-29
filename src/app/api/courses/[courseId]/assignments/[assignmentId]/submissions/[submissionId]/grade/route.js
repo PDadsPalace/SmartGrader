@@ -48,10 +48,10 @@ export async function POST(request, { params }) {
 
     } catch (error) {
         console.error("API Route Error patching specific submission:", error);
-
+        const detailedMsg = error.errors?.[0]?.message || error.message || "Forbidden";
         if (error.status === 403) {
-            return NextResponse.json({ error: "Write permission denied. Did you re-login to grant Classroom edit access?" }, { status: 403 });
+            return NextResponse.json({ error: `Google Classroom Permission Denied: ${detailedMsg}` }, { status: 403 });
         }
-        return NextResponse.json({ error: `Failed to sync grade: ${error.message || "Unknown error"}` }, { status: 500 });
+        return NextResponse.json({ error: `Failed to sync grade: ${detailedMsg}` }, { status: 500 });
     }
 }
