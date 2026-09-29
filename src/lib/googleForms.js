@@ -244,7 +244,7 @@ export async function extractGoogleFormResponse(accessToken, formId, studentEmai
  * Parse Form Responses from a CSV string (e.g. downloaded from Google Form / Sheet response tab)
  * Matches student by Email or Name, compiles Question Prompts & Student Answers for AI grading.
  */
-export function parseGoogleFormCSV(csvRows, studentEmail, studentName) {
+export function parseGoogleFormCSV(csvRows, studentEmail, studentName, maxPoints = null) {
     if (!csvRows || csvRows.length < 2) {
         return { error: "CSV file is empty or missing headers." };
     }
@@ -296,7 +296,7 @@ export function parseGoogleFormCSV(csvRows, studentEmail, studentName) {
         };
     }
 
-    // Extract native score if available in Score column (e.g. "18 / 20" or "90%")
+    // Extract native score if available in Score column (e.g. "18 / 20", "90%", or raw score "27")
     let nativeGrade = null;
     if (scoreIdx !== -1 && matchedRow[scoreIdx]) {
         const rawScore = String(matchedRow[scoreIdx]).trim();
@@ -311,6 +311,17 @@ export function parseGoogleFormCSV(csvRows, studentEmail, studentName) {
             const pctMatch = rawScore.match(/(\d+(?:\.\d+)?)%/);
             if (pctMatch) {
                 nativeGrade = Math.round(parseFloat(pctMatch[1])).toString();
+            } else {
+                // Handle raw single numeric score (e.g. "27" out of maxPoints like 30)
+                const numVal = parseFloat(rawScore);
+                if (!isNaN(numVal)) {
+                    const parsedMax = parseFloat(maxPoints);
+                    if (!isNaN(parsedMax) && parsedMax > 0 && parsedMax !== 100) {
+                        nativeGrade = Math.round((numVal / parsedMax) * 100).toString();
+                    } else {
+                        nativeGrade = Math.round(numVal).toString();
+                    }
+                }
             }
         }
     }

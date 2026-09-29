@@ -832,12 +832,20 @@ export default function GradingWorkspace() {
         setImportingGrades(true);
         const results = {};
         let count = 0;
+        const maxPts = parseFloat(assignmentInfo?.maxPoints);
         submissions.forEach(sub => {
             const effectiveGrade = sub.assignedGrade ?? sub.draftGrade;
             if (effectiveGrade != null && effectiveGrade !== undefined) {
+                const rawVal = parseFloat(effectiveGrade);
+                let finalGradeStr = String(effectiveGrade);
+                if (!isNaN(rawVal) && !isNaN(maxPts) && maxPts > 0 && maxPts !== 100) {
+                    finalGradeStr = Math.round((rawVal / maxPts) * 100).toString();
+                }
                 results[sub.id] = {
-                    grade: String(effectiveGrade),
-                    feedback: "Grade imported from Google Classroom (EdPuzzle or external tool). No AI grading was run."
+                    grade: finalGradeStr,
+                    feedback: maxPts && maxPts !== 100 && !isNaN(rawVal)
+                        ? `Grade imported from Google Classroom (${rawVal}/${maxPts} converted to ${finalGradeStr}%). No AI grading was run.`
+                        : "Grade imported from Google Classroom (EdPuzzle or external tool). No AI grading was run."
                 };
                 count++;
             } else {
@@ -1334,7 +1342,7 @@ export default function GradingWorkspace() {
                     const studentEmail = sub.studentProfile?.emailAddress;
                     const studentName = sub.studentProfile?.name?.fullName;
 
-                    const parseRes = parseGoogleFormCSV(data, studentEmail, studentName);
+                    const parseRes = parseGoogleFormCSV(data, studentEmail, studentName, assignmentInfo?.maxPoints);
                     if (parseRes && parseRes.content && !parseRes.content.startsWith("Unmatched Form CSV")) {
                         matchedCount++;
                         submissionCacheRef.current[sub.id] = parseRes;
