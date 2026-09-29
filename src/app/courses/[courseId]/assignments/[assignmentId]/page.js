@@ -1892,9 +1892,10 @@ export default function GradingWorkspace() {
                             setAiFeedback(resultObj);
                         }
                     } else {
+                        const detailedErr = gradeData.details ? `${gradeData.error} (${gradeData.details})` : (gradeData.error || "The AI rejected the request.");
                         const errObj = {
                             grade: "Error",
-                            feedback: gradeData.error || "The AI rejected the request."
+                            feedback: detailedErr
                         };
                         setBatchResults(prev => ({ ...prev, [sub.id]: errObj }));
                     }

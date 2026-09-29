@@ -117,29 +117,41 @@ CRITICAL REMINDER: Look closely at the student's file and text. If both are comp
 `;
 
 
+        const sanitizeMimeType = (mime) => {
+            if (!mime || mime === 'application/octet-stream') return 'image/png';
+            if (mime.includes('png')) return 'image/png';
+            if (mime.includes('jpeg') || mime.includes('jpg')) return 'image/jpeg';
+            if (mime.includes('webp')) return 'image/webp';
+            if (mime.includes('pdf')) return 'application/pdf';
+            if (mime.startsWith('image/')) return 'image/png';
+            return mime;
+        };
+
         let contentsData = [userPrompt];
         if (rubricFile && rubricFile.data) {
             contentsData.push({
                 inlineData: {
                     data: rubricFile.data,
-                    mimeType: rubricFile.mimeType
+                    mimeType: sanitizeMimeType(rubricFile.mimeType)
                 }
             });
         }
         if (studentFiles && Array.isArray(studentFiles)) {
             for (const sf of studentFiles) {
-                contentsData.push({
-                    inlineData: {
-                        data: sf.data,
-                        mimeType: sf.mimeType
-                    }
-                });
+                if (sf && sf.data) {
+                    contentsData.push({
+                        inlineData: {
+                            data: sf.data,
+                            mimeType: sanitizeMimeType(sf.mimeType)
+                        }
+                    });
+                }
             }
         } else if (studentFile && studentFile.data) {
             contentsData.push({
                 inlineData: {
                     data: studentFile.data,
-                    mimeType: studentFile.mimeType
+                    mimeType: sanitizeMimeType(studentFile.mimeType)
                 }
             });
         }
