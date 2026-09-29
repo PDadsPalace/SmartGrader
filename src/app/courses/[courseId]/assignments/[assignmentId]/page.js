@@ -1609,8 +1609,8 @@ export default function GradingWorkspace() {
         const totalToProcess = submissions.length;
 
         // Sliding Window Concurrency Pool
-        // We will process up to 3 students simultaneously to respect Gemini API rate limits on multi-image attachments
-        const MAX_CONCURRENT = 3;
+        // We will process up to 6 students simultaneously, starting a new one the exact moment one finishes.
+        const MAX_CONCURRENT = 6;
         let currentIndex = 0;
 
         const processSubmission = async (sub) => {
@@ -1912,10 +1912,7 @@ export default function GradingWorkspace() {
                 }
         };
 
-        const workers = Array(MAX_CONCURRENT).fill(null).map(async (_, idx) => {
-            if (idx > 0) {
-                await new Promise(r => setTimeout(r, idx * 600));
-            }
+        const workers = Array(MAX_CONCURRENT).fill(null).map(async () => {
             while (currentIndex < submissions.length && !stopGradingRef.current) {
                 const sub = submissions[currentIndex++];
                 await processSubmission(sub);
