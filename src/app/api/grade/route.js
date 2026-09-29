@@ -127,30 +127,38 @@ CRITICAL REMINDER: Look closely at the student's file and text. If both are comp
             return mime;
         };
 
+        const isValidBase64Data = (dataStr) => {
+            if (!dataStr || typeof dataStr !== 'string') return false;
+            const clean = dataStr.trim();
+            if (clean.startsWith("See attached") || clean.startsWith("Empty document") || clean.startsWith("Error:") || clean.startsWith("Unmatched")) return false;
+            // Base64 image/file data is long (at least 100 chars) and contains base64 encoding characters
+            return clean.length > 100 && /^[A-Za-z0-9+/=\r\n]+$/.test(clean);
+        };
+
         let contentsData = [userPrompt];
-        if (rubricFile && rubricFile.data) {
+        if (rubricFile && rubricFile.data && isValidBase64Data(rubricFile.data)) {
             contentsData.push({
                 inlineData: {
-                    data: rubricFile.data,
+                    data: rubricFile.data.trim(),
                     mimeType: sanitizeMimeType(rubricFile.mimeType)
                 }
             });
         }
         if (studentFiles && Array.isArray(studentFiles)) {
             for (const sf of studentFiles) {
-                if (sf && sf.data) {
+                if (sf && sf.data && isValidBase64Data(sf.data)) {
                     contentsData.push({
                         inlineData: {
-                            data: sf.data,
+                            data: sf.data.trim(),
                             mimeType: sanitizeMimeType(sf.mimeType)
                         }
                     });
                 }
             }
-        } else if (studentFile && studentFile.data) {
+        } else if (studentFile && studentFile.data && isValidBase64Data(studentFile.data)) {
             contentsData.push({
                 inlineData: {
-                    data: studentFile.data,
+                    data: studentFile.data.trim(),
                     mimeType: sanitizeMimeType(studentFile.mimeType)
                 }
             });

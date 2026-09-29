@@ -1031,7 +1031,7 @@ export default function GradingWorkspace() {
             if (multipleBinaries && multipleBinaries.length > 0) {
                  submissionTextOnly = submissionContent ? submissionContent + "\n\nSee attached files." : "See attached student files.";
                  inlineDataFilesForAI = multipleBinaries.map(mb => ({ data: mb.data, mimeType: mb.mimeType }));
-            } else if (submissionIsBinary && submissionContent) {
+            } else if (submissionIsBinary && submissionContent && !submissionContent.startsWith("See attached")) {
                 submissionTextOnly = "See attached student file.";
                 inlineDataContent = {
                     data: submissionContent,
@@ -1652,7 +1652,7 @@ export default function GradingWorkspace() {
                         inlineDataFilesForAI = docData.multipleBinaries.map(mb => ({ data: mb.data, mimeType: mb.mimeType }));
                         // keep inlineDataForAI as the first one just in case we need fallback logic
                         inlineDataForAI = { data: docData.multipleBinaries[0].data, mimeType: docData.multipleBinaries[0].mimeType };
-                    } else if (docData.data && docData.isBinary) {
+                    } else if (docData.data && docData.isBinary && !docData.data.startsWith("See attached")) {
                         submissionTextForAI = "See attached student file.";
                         inlineDataForAI = {
                             data: docData.data,
