@@ -3,7 +3,7 @@
 import { useSession } from "next-auth/react";
 import { useEffect, useState, useRef } from "react";
 import { usePathname, useRouter } from "next/navigation";
-import { ArrowLeft, User, FileText, Settings2, Sparkles, CheckCircle2, ListChecks, Download, RefreshCw, X, AlertTriangle, UploadCloud, Zap, ZoomIn, ExternalLink, Eye, Maximize2, Minimize2, Plus, Minus, Image, Layers, HelpCircle, MessageSquare, Trash2, Edit2, ChevronDown, ChevronUp, Check } from "lucide-react";
+import { ArrowLeft, User, FileText, Settings2, Sparkles, CheckCircle2, ListChecks, Download, RefreshCw, X, AlertTriangle, UploadCloud, Zap, ZoomIn, ExternalLink, Eye, Maximize2, Minimize2, Plus, Minus, Image, Layers, HelpCircle, MessageSquare, Trash2, Edit2, ChevronDown, ChevronUp, Check, Brain } from "lucide-react";
 import Papa from "papaparse";
 import stringSimilarity from "string-similarity";
 
@@ -319,6 +319,7 @@ export default function GradingWorkspace() {
     const [showEdpuzzleCsvModal, setShowEdpuzzleCsvModal] = useState(false);
     const [edpuzzleCsvError, setEdpuzzleCsvError] = useState("");
     const [generatingRubric, setGeneratingRubric] = useState(false);
+    const [smartGuessingRubric, setSmartGuessingRubric] = useState(false);
     const [selectedSimilarityMatch, setSelectedSimilarityMatch] = useState(null);
 
     // Mixed-format Google Form metadata (populated when a MIXED form is loaded)
@@ -1446,6 +1447,24 @@ export default function GradingWorkspace() {
         });
     };
 
+    const saveRubricToHistory = (name, text, points) => {
+        if (!name || !text || text.trim().length < 10) return;
+        try {
+            const stored = localStorage.getItem('smartgrader_past_rubrics');
+            let history = stored ? JSON.parse(stored) : [];
+            history = history.filter(item => item.assignmentName !== name);
+            history.unshift({
+                assignmentName: name,
+                rubricText: text.trim(),
+                maxPoints: points || 100,
+                updatedAt: new Date().toISOString()
+            });
+            localStorage.setItem('smartgrader_past_rubrics', JSON.stringify(history.slice(0, 25)));
+        } catch (e) {
+            console.error("Failed to save rubric history", e);
+        }
+    };
+
     const handleGenerateRubric = async () => {
         if (!assignmentName) return;
         setGeneratingRubric(true);
@@ -1464,11 +1483,47 @@ export default function GradingWorkspace() {
             const data = await res.json();
             if (data.feedback) {
                 setRubric(data.feedback);
+                saveRubricToHistory(assignmentName, data.feedback, assignmentInfo?.maxPoints || 100);
             }
         } catch (e) {
             console.error("Failed to generate rubric", e);
         } finally {
             setGeneratingRubric(false);
+        }
+    };
+
+    const handleSmartGuessRubric = async () => {
+        if (!assignmentName) return;
+        setSmartGuessingRubric(true);
+        try {
+            let pastRubrics = [];
+            try {
+                const stored = localStorage.getItem('smartgrader_past_rubrics');
+                if (stored) pastRubrics = JSON.parse(stored);
+            } catch (e) {
+                console.error("Error reading past rubrics from localStorage", e);
+            }
+
+            const res = await fetch('/api/grade/smart-rubric', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    assignmentName,
+                    maxPoints: assignmentInfo?.maxPoints || 100,
+                    courseName,
+                    pastRubrics
+                })
+            });
+
+            const data = await res.json();
+            if (data.rubric) {
+                setRubric(data.rubric);
+                saveRubricToHistory(assignmentName, data.rubric, assignmentInfo?.maxPoints || 100);
+            }
+        } catch (e) {
+            console.error("Failed to smart guess rubric", e);
+        } finally {
+            setSmartGuessingRubric(false);
         }
     };
 
@@ -2635,6 +2690,10 @@ export default function GradingWorkspace() {
                                                 <button onClick={handleGenerateRubric} disabled={generatingRubric} className="text-xs bg-indigo-50 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-300 hover:bg-indigo-100 border border-indigo-200 dark:border-indigo-800 px-2.5 py-1 rounded-lg font-bold flex items-center gap-1 transition-colors">
                                                     <Sparkles className="w-3.5 h-3.5 text-indigo-600 animate-pulse" />
                                                     {generatingRubric ? "Generating..." : "Generate Rubric with AI"}
+                                                </button>
+                                                <button onClick={handleSmartGuessRubric} disabled={smartGuessingRubric} className="text-xs bg-purple-50 dark:bg-purple-900/40 text-purple-700 dark:text-purple-300 hover:bg-purple-100 border border-purple-200 dark:border-purple-800 px-2.5 py-1 rounded-lg font-bold flex items-center gap-1 transition-colors" title="AI Smart Guess based on your past rubrics and grading style history">
+                                                    <Brain className="w-3.5 h-3.5 text-purple-600 animate-pulse" />
+                                                    {smartGuessingRubric ? "Thinking..." : "✨ Smart Guess My Rubric"}
                                                 </button>
                                             </div>
 
