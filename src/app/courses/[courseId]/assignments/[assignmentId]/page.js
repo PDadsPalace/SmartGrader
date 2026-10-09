@@ -6,6 +6,8 @@ import { usePathname, useRouter } from "next/navigation";
 import { ArrowLeft, User, FileText, Settings2, Sparkles, CheckCircle2, ListChecks, Download, RefreshCw, X, AlertTriangle, UploadCloud, Zap, ZoomIn, ExternalLink, Eye, Maximize2, Minimize2, Plus, Minus, Image, Layers, HelpCircle, MessageSquare, Trash2, Edit2, ChevronDown, ChevronUp, Check, Brain } from "lucide-react";
 import Papa from "papaparse";
 import stringSimilarity from "string-similarity";
+import { analyzeSubmissionIntegrity, analyzeClassIntegrity, topSeverity } from "@/lib/integrityAnalysis";
+import IntegrityPanel, { IntegrityBadge } from "@/components/IntegrityPanel";
 
 import pkg from "../../../../../../package.json";
 import { parseGoogleFormCSV } from "@/lib/formCsvParser";
@@ -194,96 +196,102 @@ export default function GradingWorkspace() {
     // Speed & Intelligence Caching & Similarity
     const submissionCacheRef = useRef({}); // { [submissionId]: docData }
     const masterKeyCacheRef = useRef({}); // { [keyStudentId]: { runtimeRubric, runtimeRubricFile } }
-    const [similarityFlags, setSimilarityFlags] = useState({}); // { [subId]: [{ matchId, matchName, score }] }
+    const [similarityFlags, setSimilarityFlags] = useState({}); // { [subId]: Flag[] } — see src/lib/integrityAnalysis.js
+    const [scanningIntegrity, setScanningIntegrity] = useState(false);
+    const [scanProgress, setScanProgress] = useState({ current: 0, total: 0 });
 
-    // Pairwise Plagiarism & String/Image Similarity Engine
+    // Integrity Check: paste/speed/owner/Lens checks per student + shared-mistake
+    // checks across the class. Pure in-browser math on data we already fetched,
+    // so it takes milliseconds and never slows grading down.
     const runSimilarityCheck = (subList = submissions) => {
-        const textMap = {};
-        const imageMap = {};
+        try {
+            const roster = subList.map(sub => ({
+                subId: sub.id,
+                email: sub?.studentProfile?.emailAddress || null,
+                name: sub?.studentProfile?.name?.fullName || null,
+            }));
 
-        subList.forEach(sub => {
-            const cached = submissionCacheRef.current[sub.id];
-            if (cached) {
+            const newFlags = {};
+            const classEntries = [];
+
+            subList.forEach(sub => {
+                const cached = submissionCacheRef.current[sub.id];
+                if (!cached) return;
+
+                // 1. This student's own file history
+                if (cached.integrity) {
+                    const own = analyzeSubmissionIntegrity({
+                        integrity: cached.integrity,
+                        student: { subId: sub.id, email: sub?.studentProfile?.emailAddress, name: sub?.studentProfile?.name?.fullName },
+                        roster,
+                    });
+                    if (own.length) newFlags[sub.id] = own;
+                }
+
+                // 2. Collect text + image fingerprints for the class-wide comparison
                 let text = cached.data || cached.content || "";
-                if (text && text.length > 50 && !text.startsWith("Empty document") && !text.startsWith("See attached") && !text.includes("Google Form Responses for:")) {
-                    textMap[sub.id] = text.trim();
+                if (!(text && text.length > 50 && !text.startsWith("Empty document") && !text.startsWith("See attached") && !text.includes("Google Form Responses for:"))) {
+                    text = "";
                 }
-
-                // Collect image/binary fingerprints for screenshot duplication check
-                const binaries = cached.multipleBinaries || [];
-                if (binaries.length > 0) {
-                    const fingerprints = binaries.map(b => {
-                        const raw = b.data ? (b.data.split(",")[1] || b.data) : "";
-                        if (raw.length > 100) {
-                            return `${raw.length}_${raw.substring(0, 150)}_${raw.substring(Math.floor(raw.length / 2), Math.floor(raw.length / 2) + 150)}_${raw.substring(raw.length - 150)}`;
-                        }
-                        return raw;
-                    }).filter(fp => fp.length > 0);
-
-                    if (fingerprints.length > 0) {
-                        imageMap[sub.id] = fingerprints;
+                const imageFingerprints = (cached.multipleBinaries || []).map(b => {
+                    const raw = b.data ? (b.data.split(",")[1] || b.data) : "";
+                    if (raw.length > 100) {
+                        return `${raw.length}_${raw.substring(0, 150)}_${raw.substring(Math.floor(raw.length / 2), Math.floor(raw.length / 2) + 150)}_${raw.substring(raw.length - 150)}`;
                     }
-                }
+                    return raw;
+                }).filter(fp => fp.length > 0);
+
+                classEntries.push({ subId: sub.id, text: text.trim(), imageFingerprints });
+            });
+
+            const classResult = analyzeClassIntegrity(classEntries);
+            for (const [subId, list] of Object.entries(classResult.flags)) {
+                newFlags[subId] = [...(newFlags[subId] || []), ...list];
             }
-        });
 
-        const newFlags = {};
+            // Strongest flags first
+            const rank = { high: 0, medium: 1, low: 2 };
+            for (const id of Object.keys(newFlags)) newFlags[id].sort((a, b) => rank[a.severity] - rank[b.severity]);
 
-        for (let i = 0; i < subList.length; i++) {
-            const subA = subList[i];
-            const idA = subA.id;
-            const nameA = subA?.studentProfile?.name?.fullName || "Student";
-            const textA = textMap[idA];
-            const imagesA = imageMap[idA];
-
-            for (let j = i + 1; j < subList.length; j++) {
-                const subB = subList[j];
-                const idB = subB.id;
-                const nameB = subB?.studentProfile?.name?.fullName || "Student";
-                const textB = textMap[idB];
-                const imagesB = imageMap[idB];
-
-                // 1. Text Similarity Check
-                if (textA && textB) {
-                    const similarity = stringSimilarity.compareTwoStrings(textA, textB);
-                    const matchPct = Math.round(similarity * 100);
-
-                    if (matchPct >= 85) {
-                        if (!newFlags[idA]) newFlags[idA] = [];
-                        if (!newFlags[idB]) newFlags[idB] = [];
-
-                        newFlags[idA].push({ matchId: idB, matchName: nameB, score: matchPct, type: 'text' });
-                        newFlags[idB].push({ matchId: idA, matchName: nameA, score: matchPct, type: 'text' });
-                    }
-                }
-
-                // 2. Exact Screenshot / Image Match Check
-                if (imagesA && imagesB) {
-                    let imageMatched = false;
-                    for (const imgA of imagesA) {
-                        if (imagesB.includes(imgA)) {
-                            imageMatched = true;
-                            break;
-                        }
-                    }
-
-                    if (imageMatched) {
-                        if (!newFlags[idA]) newFlags[idA] = [];
-                        if (!newFlags[idB]) newFlags[idB] = [];
-
-                        if (!newFlags[idA].some(m => m.matchId === idB && m.type === 'image')) {
-                            newFlags[idA].push({ matchId: idB, matchName: nameB, score: 100, type: 'image' });
-                        }
-                        if (!newFlags[idB].some(m => m.matchId === idA && m.type === 'image')) {
-                            newFlags[idB].push({ matchId: idA, matchName: nameA, score: 100, type: 'image' });
-                        }
-                    }
-                }
-            }
+            setSimilarityFlags(newFlags);
+        } catch (err) {
+            // The integrity check must never break grading.
+            console.error("Integrity check failed:", err);
         }
-
-        setSimilarityFlags(newFlags);
     };
+
+    // Load every student's file (without grading) and run the Integrity Check.
+    const handleScanIntegrity = async () => {
+        if (submissions.length === 0 || scanningIntegrity) return;
+        const toFetch = submissions.filter(sub => !submissionCacheRef.current[sub.id] && (sub.assignmentSubmission?.attachments?.length || 0) > 0);
+        setScanningIntegrity(true);
+        setScanProgress({ current: 0, total: toFetch.length });
+        let done = 0;
+        let cursor = 0;
+        const worker = async () => {
+            while (cursor < toFetch.length) {
+                const sub = toFetch[cursor++];
+                try {
+                    const res = await fetch(`/api/courses/${courseId}/assignments/${assignmentId}/submissions/${sub.id}`);
+                    if (res.ok) {
+                        submissionCacheRef.current[sub.id] = await res.json();
+                    }
+                } catch (e) {
+                    console.warn("Integrity scan: couldn't load", sub.id, e);
+                }
+                done++;
+                setScanProgress({ current: done, total: toFetch.length });
+            }
+        };
+        await Promise.all(Array(Math.min(6, Math.max(1, toFetch.length))).fill(null).map(worker));
+        runSimilarityCheck(submissions);
+        setScanningIntegrity(false);
+    };
+
+    const flaggedCount = Object.values(similarityFlags).filter(list => {
+        const lvl = topSeverity(list);
+        return lvl === "high" || lvl === "medium";
+    }).length;
 
     // Sync to Classroom
     const [isSyncing, setIsSyncing] = useState(false);
@@ -985,6 +993,7 @@ export default function GradingWorkspace() {
                 })
                 .then((data) => {
                     submissionCacheRef.current[selectedSubmission.id] = data; // Cache in memory
+                    runSimilarityCheck(submissions); // refresh Integrity Check flags (milliseconds)
                     if (data.data) {
                         setSubmissionContent(data.data);
                         setSubmissionMime(data.mimeType);
@@ -2043,6 +2052,21 @@ export default function GradingWorkspace() {
         return sub?.studentProfile?.name?.fullName || "Student Name";
     };
 
+    // Integrity Check helpers
+    const nameForSubId = (subId) => {
+        const idx = submissions.findIndex(s => s.id === subId);
+        return idx >= 0 ? getMaskedName(submissions[idx], idx) : "another student";
+    };
+    const openStudentById = (subId) => {
+        const sub = submissions.find(s => s.id === subId);
+        if (!sub) return;
+        setSelectedSubmission(sub);
+        localStorage.setItem(`last_student_${courseId}_${assignmentId}`, sub.id);
+        setAiFeedback(batchResults[sub.id] || null);
+        setStudentNotes(localStorage.getItem(`student_notes_${sub.userId}`) || "");
+        setStudentGradeFloor(localStorage.getItem(`student_floor_${sub.userId}`) || "");
+    };
+
     if (!session) return null;
 
     const filteredSubmissions = submissions.filter(sub => {
@@ -2050,6 +2074,10 @@ export default function GradingWorkspace() {
         const isGraded = result && result.grade !== "Not Graded" && result.grade !== "Error" && result.grade !== "Failed" && result.grade !== "N/A";
 
         if (filterMode === "Graded") return isGraded;
+        if (filterMode === "Flagged") {
+            const lvl = topSeverity(similarityFlags[sub.id]);
+            return lvl === "high" || lvl === "medium";
+        }
         if (filterMode === "Ungraded") return !isGraded;
         return true;
     });
@@ -2119,9 +2147,22 @@ export default function GradingWorkspace() {
                                 <option value="All">Show All</option>
                                 <option value="Ungraded">Ungraded Only</option>
                                 <option value="Graded">Graded Only</option>
+                                <option value="Flagged">🚩 Flagged Only</option>
                             </select>
                         </div>
                         <div className="flex flex-wrap items-center gap-2 w-full justify-end">
+                            {submissions.length > 0 && (
+                                <button
+                                    onClick={handleScanIntegrity}
+                                    disabled={scanningIntegrity || batchGrading}
+                                    className="text-xs bg-rose-50 dark:bg-rose-900/40 text-rose-700 dark:text-rose-300 hover:bg-rose-100 border border-rose-200 dark:border-rose-800 px-2.5 py-1 rounded-lg font-bold flex items-center gap-1 transition-colors h-8 whitespace-nowrap disabled:opacity-60 cursor-pointer"
+                                    title="Check every student's file for copy-and-paste (Google Lens) and copying from friends — without grading"
+                                >
+                                    {scanningIntegrity
+                                        ? <><RefreshCw className="w-3.5 h-3.5 animate-spin" /> Checking {scanProgress.current}/{scanProgress.total}</>
+                                        : <>🚩 Check for Copying{flaggedCount > 0 ? ` (${flaggedCount})` : ""}</>}
+                                </button>
+                            )}
                             <button
                                 onClick={() => setShowFormsCsvModal(true)}
                                 className="text-xs bg-indigo-50 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-300 hover:bg-indigo-100 border border-indigo-200 dark:border-indigo-800 px-2.5 py-1 rounded-lg font-bold flex items-center gap-1 transition-colors h-8 whitespace-nowrap"
@@ -2293,18 +2334,7 @@ export default function GradingWorkspace() {
                                     <div className="flex justify-between items-start mb-1">
                                         <span className="font-semibold text-slate-900 dark:text-slate-50">{getMaskedName(sub, submissions.findIndex(s => s.id === sub.id))}</span>
                                         <div className="flex gap-2 flex-wrap justify-end">
-                                            {similarityFlags[sub.id] && similarityFlags[sub.id].length > 0 && (
-                                                <span
-                                                    className={`text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1 border ${
-                                                        similarityFlags[sub.id].some(m => m.type === 'image')
-                                                            ? 'bg-purple-100 dark:bg-purple-900/60 text-purple-800 dark:text-purple-300 border-purple-300 dark:border-purple-700'
-                                                            : 'bg-amber-100 dark:bg-amber-900/60 text-amber-800 dark:text-amber-300 border-amber-300 dark:border-amber-700'
-                                                    }`}
-                                                    title={`High similarity with ${similarityFlags[sub.id].map(m => m.matchName + ' (' + m.score + '% ' + (m.type === 'image' ? 'Image' : 'Text') + ')').join(', ')}`}
-                                                >
-                                                    {similarityFlags[sub.id].some(m => m.type === 'image') ? '🖼️ 100% Image Match' : `⚠️ ${similarityFlags[sub.id][0].score}% Match`}
-                                                </span>
-                                            )}
+                                            <IntegrityBadge flags={similarityFlags[sub.id]} nameFor={nameForSubId} />
                                             {(sub.late || sub.assignmentSubmission?.late) && (
                                                 <span className="text-[10px] uppercase tracking-wider font-bold bg-red-100 text-red-700 px-2 py-0.5 rounded-full">Late</span>
                                             )}
@@ -2904,6 +2934,17 @@ export default function GradingWorkspace() {
                                 </div>
                             </div>
 
+                            {/* Integrity Check (copy/paste & copying-from-friends clues) */}
+                            {!contentLoading && (
+                                <IntegrityPanel
+                                    key={selectedSubmission.id}
+                                    flags={similarityFlags[selectedSubmission.id] || []}
+                                    integrity={submissionCacheRef.current[selectedSubmission.id]?.integrity}
+                                    nameFor={nameForSubId}
+                                    onOpenStudent={openStudentById}
+                                />
+                            )}
+
                             {/* AI Feedback Results */}
                             {!aiFeedback && !contentLoading && (
                                 <div className="bg-slate-50 dark:bg-slate-900 p-6 rounded-2xl border border-slate-200 dark:border-slate-800 animate-in slide-in-from-bottom-4 duration-300 mt-6">
@@ -2959,22 +3000,6 @@ export default function GradingWorkspace() {
                                             </div>
                                         </h3>
                                     </div>
-
-                                    {similarityFlags[selectedSubmission?.id] && similarityFlags[selectedSubmission.id].length > 0 && (
-                                        <div className="mb-4 p-3 bg-amber-100/90 dark:bg-amber-900/60 border border-amber-300 dark:border-amber-700 rounded-xl text-amber-950 dark:text-amber-200 text-xs font-semibold shadow-sm">
-                                            <div className="font-bold flex items-center gap-1.5 text-amber-900 dark:text-amber-100 mb-1">
-                                                <span>⚠️ Plagiarism / High Text Similarity Alert</span>
-                                            </div>
-                                            <p>This submission matches text from other student(s) in the class:</p>
-                                            <ul className="list-disc list-inside mt-1 space-y-0.5">
-                                                {similarityFlags[selectedSubmission.id].map((match, idx) => (
-                                                    <li key={idx}>
-                                                        <strong>{match.matchName}</strong>: <span className="underline">{match.score}% similarity</span>
-                                                    </li>
-                                                ))}
-                                            </ul>
-                                        </div>
-                                    )}
 
                                     <div className="mb-4 relative z-10">
                                         <div className="flex justify-between items-center mb-1">

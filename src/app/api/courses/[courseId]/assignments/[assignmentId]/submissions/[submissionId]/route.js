@@ -2,6 +2,8 @@ import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 import { getClassroomClient } from "@/lib/googleClassroom";
 import { exportGoogleDocToText } from "@/lib/googleDrive";
+import { getFileIntegrity } from "@/lib/driveIntegrity";
+import { textStats } from "@/lib/integrityAnalysis";
 import { extractGoogleFormResponse } from "@/lib/googleForms";
 import { NextResponse } from "next/server";
 
@@ -87,6 +89,7 @@ export async function GET(request, { params }) {
 
         let combinedText = "";
         let multipleBinaries = [];
+        const integrityFiles = []; // file history for the cheating checks (owner, versions, timing)
         let totalBinaryChars = 0;
         const BINARY_LIMIT = 2500000; // ~2.5MB limit for base64 to avoid Vercel 4.5MB JSON payload limits
 
@@ -109,7 +112,20 @@ export async function GET(request, { params }) {
                 continue;
             }
 
-            const exportData = await exportGoogleDocToText(session.accessToken, fileId);
+            // Fetch the file's history at the SAME time as its text, so the
+            // integrity check adds essentially no extra waiting.
+            const [exportData, fileIntegrity] = await Promise.all([
+                exportGoogleDocToText(session.accessToken, fileId),
+                isOriginalMaterial ? Promise.resolve(null) : getFileIntegrity(session.accessToken, fileId),
+            ]);
+            if (fileIntegrity) {
+                integrityFiles.push({
+                    ...fileIntegrity,
+                    stats: exportData && !exportData.isBinary && typeof exportData.data === "string" && !exportData.data.startsWith("Fatal Error")
+                        ? textStats(exportData.data)
+                        : null,
+                });
+            }
             
             if (exportData) {
                 if (exportData.isBinary) {
@@ -135,7 +151,20 @@ export async function GET(request, { params }) {
              throw new Error("Failed to export documents.");
         }
 
+        // When did the student turn it in? (last TURNED_IN event in Classroom's history)
+        let turnedInAt = null;
+        for (const h of submission.submissionHistory || []) {
+            if (h.stateHistory?.state === "TURNED_IN" && h.stateHistory.stateTimestamp) {
+                if (!turnedInAt || h.stateHistory.stateTimestamp > turnedInAt) turnedInAt = h.stateHistory.stateTimestamp;
+            }
+        }
+
         return NextResponse.json({
+            integrity: {
+                files: integrityFiles,
+                turnedInAt,
+                viewerEmail: session.user?.email || null,
+            },
             data: combinedText ? combinedText.trim() : "See attached student files.",
             isBinary: multipleBinaries.length > 0,
             multipleBinaries: multipleBinaries,
