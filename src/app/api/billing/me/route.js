@@ -22,14 +22,13 @@ export async function GET() {
         const bills = results.map((r) => {
             const bill = r.bills.find((b) => b.email === email);
             if (!bill) return null;
-            const cardAmount = settings.passCardFeeToPayer ? withCardFee(bill.total) : bill.total;
+            const cardAmount = settings.passCardFeeToPayer && bill.total > 0 ? withCardFee(bill.total) : bill.total;
             return {
                 month: r.month,
                 isCurrent: r.month === current,
                 calls: bill.calls,
                 aiCost: bill.aiCost,
-                fixedShare: bill.fixedShare,
-                splitCount: r.summary.splitCount,
+                baseFee: bill.baseFee,
                 total: bill.total,
                 cardAmount,
                 canPayByCard: bill.total >= STRIPE_MINIMUM && Boolean(process.env.STRIPE_SECRET_KEY),
@@ -41,7 +40,7 @@ export async function GET() {
         return NextResponse.json({
             isAdmin: isAdmin(email),
             venmoUsername: settings.venmoUsername,
-            fixedCosts: settings.fixedCosts,
+            baseFee: settings.baseFee,
             passCardFeeToPayer: settings.passCardFeeToPayer,
             bills,
         });

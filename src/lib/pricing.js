@@ -56,23 +56,22 @@ export function withCardFee(amount) {
 
 /**
  * Build every user's bill for one month.
+ * Bill = monthly base fee + the person's own AI cost, only for people who used the app that month.
+ * The owner is never billed, but their own spending is still shown.
  * usageRows: [{ email, calls, costUsd, ... }]
- * settings:  { fixedCosts: [{ name, monthly }], ownerSharesFixed, ownerEmails }
- * payments:  { [email]: { status, method, ... } }
+ * settings:  { baseFee, fixedCosts: [{ name, monthly }], ownerEmails }
+ * payments:  { [email]: { status, method, amount, ... } }
  */
 export function computeBills(usageRows, settings, payments = {}) {
+    const baseFee = roundCents(Math.max(0, Number(settings.baseFee) || 0));
     const fixedTotal = (settings.fixedCosts || []).reduce((s, c) => s + (Number(c.monthly) || 0), 0);
     const owners = (settings.ownerEmails || []).map((e) => e.toLowerCase());
     const active = usageRows.filter((r) => (r.calls || 0) > 0);
-    const isOwner = (email) => owners.includes(email.toLowerCase());
-    const splitters = active.filter((r) => settings.ownerSharesFixed !== false || !isOwner(r.email));
-    const share = splitters.length ? fixedTotal / splitters.length : 0;
 
     const bills = active.map((r) => {
-        const owner = isOwner(r.email);
+        const isOwner = owners.includes(r.email.toLowerCase());
         const aiCost = roundCents(r.costUsd || 0);
-        const fixedShare = splitters.includes(r) ? roundCents(share) : 0;
-        const total = roundCents(aiCost + fixedShare);
+        const fee = isOwner ? 0 : baseFee;
         return {
             email: r.email,
             calls: r.calls || 0,
@@ -80,24 +79,31 @@ export function computeBills(usageRows, settings, payments = {}) {
             outputTokens: r.outputTokens || 0,
             aiCostExact: r.costUsd || 0,
             aiCost,
-            fixedShare,
-            total,
-            isOwner: owner,
+            baseFee: fee,
+            total: roundCents(aiCost + fee),
+            isOwner,
             payment: payments[r.email] || null,
         };
     }).sort((a, b) => b.total - a.total);
 
-    const exactAi = active.reduce((s, r) => s + (r.costUsd || 0), 0);
+    const aiTotal = active.reduce((s, r) => s + (r.costUsd || 0), 0);
+    const others = bills.filter((b) => !b.isOwner);
+    const owed = others.reduce((s, b) => s + b.total, 0);
+    const collected = others.filter((b) => b.payment?.status === "paid").reduce((s, b) => s + (b.payment.amount ?? b.total), 0);
+    const ownerAi = bills.filter((b) => b.isOwner).reduce((s, b) => s + b.aiCostExact, 0);
     return {
         bills,
         summary: {
             activeUsers: active.length,
-            splitCount: splitters.length,
+            payingUsers: others.length,
+            baseFee,
             fixedTotal: roundCents(fixedTotal),
-            aiTotal: roundCents(exactAi),
-            grandTotal: roundCents(exactAi + fixedTotal),
-            owedByOthers: roundCents(bills.filter((b) => !b.isOwner).reduce((s, b) => s + b.total, 0)),
-            collected: roundCents(bills.filter((b) => b.payment?.status === "paid").reduce((s, b) => s + (b.payment.amount ?? b.total), 0)),
+            aiTotal: roundCents(aiTotal),
+            ownerAi: roundCents(ownerAi),
+            totalCost: roundCents(aiTotal + fixedTotal),          // what you pay Google + Vercel + GitHub
+            owedByOthers: roundCents(owed),
+            collected: roundCents(collected),
+            youCover: roundCents(aiTotal + fixedTotal - owed),    // your out-of-pocket if everyone pays
         },
     };
 }

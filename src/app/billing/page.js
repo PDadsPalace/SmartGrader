@@ -52,7 +52,6 @@ export default function MyBillPage() {
         setBusy(null);
     };
 
-    const fixedTotal = (data?.fixedCosts || []).reduce((s, c) => s + (Number(c.monthly) || 0), 0);
 
     return (
         <BillingShell
@@ -69,9 +68,8 @@ export default function MyBillPage() {
                     <Card className="flex gap-3 text-sm text-slate-600 dark:text-slate-300">
                         <Info className="w-5 h-5 shrink-0 text-[#760296]" />
                         <p>
-                            You pay what your own AI grading actually cost that month, plus an even share of the
-                            hosting costs ({money(fixedTotal)}/month: {(data.fixedCosts || []).filter(c => c.monthly > 0).map(c => `${c.name} ${money(c.monthly)}`).join(", ") || "none right now"}),
-                            split among everyone who used SmartGrAIder that month. No usage, no bill.
+                            Each month you use SmartGrAIder, you pay a {money(data.baseFee)} base fee (hosting) plus what
+                            your own AI grading actually cost. Months you don't use it are free.
                             {data.passCardFeeToPayer && " Card payments add the card processing fee; Venmo doesn't."}
                         </p>
                     </Card>
@@ -87,11 +85,12 @@ export default function MyBillPage() {
                                         <StatusPill payment={bill.payment} isCurrent={bill.isCurrent} isOwner={bill.isOwner} />
                                     </div>
                                     <dl className="mt-2 grid grid-cols-[auto_auto] gap-x-6 gap-y-1 text-sm">
+                                        {!bill.isOwner && <><dt className="text-slate-500">Base fee</dt><dd className="text-right tabular-nums">{money(bill.baseFee)}</dd></>}
                                         <dt className="text-slate-500">AI grading ({bill.calls} AI requests)</dt><dd className="text-right tabular-nums">{money(bill.aiCost)}</dd>
-                                        <dt className="text-slate-500">Hosting share (÷{bill.splitCount})</dt><dd className="text-right tabular-nums">{money(bill.fixedShare)}</dd>
-                                        <dt className="font-semibold">{bill.isCurrent ? "So far" : "Total"}</dt><dd className="text-right font-semibold tabular-nums">{money(bill.total)}</dd>
+                                        <dt className="font-semibold">{bill.isOwner ? "Your AI spending" : bill.isCurrent ? "So far" : "Total"}</dt><dd className="text-right font-semibold tabular-nums">{money(bill.total)}</dd>
                                     </dl>
-                                    {bill.isCurrent && <p className="mt-2 text-xs text-slate-500">This month is still running. The hosting share can go down if more people use it.</p>}
+                                    {bill.isOwner && <p className="mt-2 text-xs text-slate-500">You're the owner, so this isn't billed. It's what your own grading cost.</p>}
+                                    {bill.isCurrent && !bill.isOwner && <p className="mt-2 text-xs text-slate-500">This month is still running. You can pay once it ends.</p>}
                                 </div>
 
                                 {!bill.isCurrent && !bill.isOwner && bill.payment?.status !== "paid" && bill.total > 0 && (

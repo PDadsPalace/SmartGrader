@@ -32,8 +32,8 @@ export default function AdminBillingPage() {
         if (!json.notConfigured) {
             if (!m) setMonth(json.month);
             setSettings((s) => s || {
+                baseFee: json.settings.baseFee,
                 fixedCosts: json.settings.fixedCosts,
-                ownerSharesFixed: json.settings.ownerSharesFixed,
                 passCardFeeToPayer: json.settings.passCardFeeToPayer,
                 venmoUsername: json.settings.venmoUsername,
             });
@@ -101,10 +101,10 @@ export default function AdminBillingPage() {
 
             {s && (
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                    <Stat label={isCurrent ? "AI cost so far" : "AI cost"} value={money(s.aiTotal)} sub="Gemini, all users" />
-                    <Stat label="Fixed costs" value={money(s.fixedTotal)} sub={`split ÷ ${s.splitCount}`} />
-                    <Stat label="Owed by friends" value={money(s.owedByOthers)} sub={`${s.activeUsers} active user${s.activeUsers === 1 ? "" : "s"}`} />
+                    <Stat label={isCurrent ? "Your costs so far" : "Your costs"} value={money(s.totalCost)} sub={`AI ${money(s.aiTotal)} (yours ${money(s.ownerAi)}) + fixed ${money(s.fixedTotal)}`} />
+                    <Stat label="Owed by friends" value={money(s.owedByOthers)} sub={`${s.payingUsers} paying · ${money(s.baseFee)} base each`} />
                     <Stat label="Collected" value={money(s.collected)} sub={`${money(Math.max(0, s.owedByOthers - s.collected))} outstanding`} />
+                    <Stat label={s.youCover >= 0 ? "You cover" : "Extra after costs"} value={money(Math.abs(s.youCover))} sub="if everyone pays" />
                 </div>
             )}
 
@@ -116,7 +116,7 @@ export default function AdminBillingPage() {
                                 <th className="p-3">Teacher</th>
                                 <th className="p-3 text-right">AI requests</th>
                                 <th className="p-3 text-right">AI cost</th>
-                                <th className="p-3 text-right">Hosting</th>
+                                <th className="p-3 text-right">Base fee</th>
                                 <th className="p-3 text-right">Total</th>
                                 <th className="p-3">Status</th>
                                 <th className="p-3"></th>
@@ -129,7 +129,7 @@ export default function AdminBillingPage() {
                                     <td className="p-3 font-medium">{b.email}</td>
                                     <td className="p-3 text-right tabular-nums">{b.calls}</td>
                                     <td className="p-3 text-right tabular-nums" title={`$${b.aiCostExact.toFixed(4)} · ${b.inputTokens.toLocaleString()} in / ${b.outputTokens.toLocaleString()} out tokens`}>{money(b.aiCost)}</td>
-                                    <td className="p-3 text-right tabular-nums">{money(b.fixedShare)}</td>
+                                    <td className="p-3 text-right tabular-nums">{b.isOwner ? "—" : money(b.baseFee)}</td>
                                     <td className="p-3 text-right tabular-nums font-semibold">{money(b.total)}</td>
                                     <td className="p-3"><StatusPill payment={b.payment} isCurrent={isCurrent} isOwner={b.isOwner} /></td>
                                     <td className="p-3 text-right">
@@ -149,7 +149,18 @@ export default function AdminBillingPage() {
             {settings && (
                 <Card>
                     <h2 className="text-lg font-bold mb-1">Settings</h2>
-                    <p className="text-sm text-slate-500 mb-4">Fixed monthly costs are split evenly among everyone who used the app that month. Changes apply to every month's bill, including past unpaid ones.</p>
+                    <p className="text-sm text-slate-500 mb-4">Friends pay the base fee plus their own AI cost in any month they use the app. Changes apply to every unpaid bill, including past months.</p>
+
+                    <label className="flex items-center gap-2 text-sm font-medium mb-5">
+                        Base fee per person
+                        <span className="text-slate-500">$</span>
+                        <input type="number" min="0" step="0.01" value={settings.baseFee} onChange={(e) => setSettings((s) => ({ ...s, baseFee: e.target.value }))}
+                            className="w-24 px-3 py-2 rounded-lg bg-slate-100 dark:bg-slate-800 text-right" />
+                        <span className="text-xs text-slate-500">/month</span>
+                    </label>
+
+                    <h3 className="text-sm font-semibold mb-1">Your monthly costs</h3>
+                    <p className="text-xs text-slate-500 mb-2">For tracking only — compared against what you collect. Not split or billed directly.</p>
 
                     <div className="space-y-2">
                         {settings.fixedCosts.map((c, i) => (
@@ -173,10 +184,6 @@ export default function AdminBillingPage() {
                             Venmo username @
                             <input value={settings.venmoUsername} onChange={(e) => setSettings((s) => ({ ...s, venmoUsername: e.target.value }))}
                                 className="px-3 py-2 rounded-lg bg-slate-100 dark:bg-slate-800" placeholder="your-venmo" />
-                        </label>
-                        <label className="flex items-center gap-2">
-                            <input type="checkbox" checked={settings.ownerSharesFixed} onChange={(e) => setSettings((s) => ({ ...s, ownerSharesFixed: e.target.checked }))} />
-                            Count me as one of the people splitting fixed costs
                         </label>
                         <label className="flex items-center gap-2">
                             <input type="checkbox" checked={settings.passCardFeeToPayer} onChange={(e) => setSettings((s) => ({ ...s, passCardFeeToPayer: e.target.checked }))} />

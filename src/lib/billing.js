@@ -3,11 +3,11 @@ import { getDb } from "./firebaseAdmin";
 import { computeBills } from "./pricing";
 
 export const DEFAULT_SETTINGS = {
-    fixedCosts: [
-        { name: "Vercel", monthly: 0 },
+    baseFee: 6.5,                // charged to each friend in any month they use the app
+    fixedCosts: [                // what the owner pays — shown for tracking only, not billed directly
+        { name: "Vercel", monthly: 20 },
         { name: "GitHub", monthly: 0 },
     ],
-    ownerSharesFixed: true,      // the owner counts as one of the people splitting fixed costs
     passCardFeeToPayer: true,    // card payers cover Stripe's 2.9% + 30¢
     venmoUsername: "",
 };
@@ -29,7 +29,7 @@ export async function saveSettings(input) {
         fixedCosts: (input.fixedCosts || [])
             .map((c) => ({ name: String(c.name || "").slice(0, 40).trim(), monthly: Math.max(0, Number(c.monthly) || 0) }))
             .filter((c) => c.name),
-        ownerSharesFixed: input.ownerSharesFixed !== false,
+        baseFee: Math.round(Math.max(0, Number(input.baseFee) || 0) * 100) / 100,
         passCardFeeToPayer: input.passCardFeeToPayer !== false,
         venmoUsername: String(input.venmoUsername || "").replace(/^@/, "").replace(/[^A-Za-z0-9_-]/g, "").slice(0, 30),
     };
