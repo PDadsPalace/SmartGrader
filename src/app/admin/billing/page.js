@@ -25,9 +25,15 @@ export default function AdminBillingPage() {
 
     const load = async (m = month) => {
         setError(null);
-        const res = await fetch(`/api/billing/admin${m ? `?month=${m}` : ""}`, { cache: "no-store" });
-        const json = await res.json();
-        if (!res.ok) { setError(json.error || "Could not load."); return; }
+        let res, json;
+        try {
+            res = await fetch(`/api/billing/admin${m ? `?month=${m}` : ""}`, { cache: "no-store" });
+            json = await res.json();
+        } catch (e) {
+            setError(`Could not reach the billing server (${res ? `HTTP ${res.status}` : e.message}). Try refreshing.`);
+            return;
+        }
+        if (!res.ok) { setError([json.error, json.details].filter(Boolean).join(" — ") || "Could not load."); return; }
         setData(json);
         if (!json.notConfigured) {
             if (!m) setMonth(json.month);
