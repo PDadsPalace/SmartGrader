@@ -9,7 +9,7 @@ export const DEFAULT_SETTINGS = {
         { name: "GitHub", monthly: 0 },
     ],
     passCardFeeToPayer: true,    // card payers cover Stripe's 2.9% + 30¢
-    venmoUsername: "",
+    venmoUsername: "Danielle-Panfili-1",
 };
 
 export function adminEmails() {
