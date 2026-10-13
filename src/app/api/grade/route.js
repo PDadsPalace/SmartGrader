@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { GoogleGenAI } from "@google/genai";
+import { recordUsage } from "@/lib/usage";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "../auth/[...nextauth]/route";
 
@@ -203,6 +204,7 @@ CRITICAL REMINDER: Look closely at the student's file and text. If both are comp
                         temperature: 0.1
                     }
                 });
+                await recordUsage({ email: session.user.email, route: "grade", response });
                 break;
             } catch (apiErr) {
                 lastError = apiErr;

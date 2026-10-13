@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { GoogleGenAI } from "@google/genai";
+import { recordUsage } from "@/lib/usage";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "../../auth/[...nextauth]/route";
 
@@ -70,6 +71,7 @@ ${pastRubricsSection}
                         temperature: 0.2
                     }
                 });
+                await recordUsage({ email: session.user.email, route: "smart-rubric", response });
                 break;
             } catch (apiErr) {
                 lastError = apiErr;

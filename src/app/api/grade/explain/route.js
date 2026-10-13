@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { GoogleGenAI } from "@google/genai";
+import { recordUsage } from "@/lib/usage";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "../../auth/[...nextauth]/route";
 
@@ -74,6 +75,8 @@ Please explain why ${studentName} received ${assignedGrade}/${maxPoints}.
                 temperature: 0.2
             }
         });
+
+        await recordUsage({ email: session.user.email, route: "explain", response });
 
         const explanationText = typeof response.text === 'function' ? response.text() : response.text;
 
