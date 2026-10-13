@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useSession } from "next-auth/react";
+import { useSession, signIn } from "next-auth/react";
 import { Plus, Trash2, Save, AlertTriangle } from "lucide-react";
 import { BillingShell, Card, StatusPill, money, monthName } from "@/components/BillingShell";
 
@@ -71,6 +71,10 @@ export default function AdminBillingPage() {
 
     const updateCost = (i, field, value) =>
         setSettings((s) => ({ ...s, fixedCosts: s.fixedCosts.map((c, j) => (j === i ? { ...c, [field]: value } : c)) }));
+
+    if (status === "unauthenticated") {
+        return <BillingShell title="Billing Admin"><Card><button onClick={() => signIn("google")} className="px-4 py-2 rounded-lg bg-[#760296] text-white font-semibold">Sign in with Google</button></Card></BillingShell>;
+    }
 
     if (data?.notConfigured) {
         return <BillingShell title="Billing Admin"><Card>Add the <code>FIREBASE_SERVICE_ACCOUNT</code> environment variable in Vercel, then redeploy.</Card></BillingShell>;
