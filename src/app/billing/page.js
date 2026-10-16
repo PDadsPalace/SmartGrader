@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useSession, signIn } from "next-auth/react";
-import { CreditCard, Send, Info, Shield } from "lucide-react";
+import { CreditCard, Send, Info, Shield, Ticket } from "lucide-react";
 import { BillingShell, Card, StatusPill, money, monthName } from "@/components/BillingShell";
 
 export default function MyBillPage() {
@@ -11,6 +11,8 @@ export default function MyBillPage() {
     const [error, setError] = useState(null);
     const [busy, setBusy] = useState(null);
     const [paidMonth, setPaidMonth] = useState(null);
+    const [code, setCode] = useState("");
+    const [couponMsg, setCouponMsg] = useState(null);
 
     const load = async () => {
         try {
@@ -38,6 +40,21 @@ export default function MyBillPage() {
             if (!res.ok) throw new Error(json.error);
             window.location.href = json.url;
         } catch (e) { setError(e.message); setBusy(null); }
+    };
+
+    const redeem = async (e) => {
+        e.preventDefault();
+        if (!code.trim()) return;
+        setBusy("coupon"); setCouponMsg(null);
+        try {
+            const res = await fetch("/api/billing/coupon", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ code }) });
+            const json = await res.json();
+            if (!res.ok) throw new Error(json.error || "Could not apply that code.");
+            setCouponMsg({ ok: true, text: `Applied: ${json.applied}${json.until ? ` through ${monthName(json.until)}` : ""}.` });
+            setCode("");
+            await load();
+        } catch (err) { setCouponMsg({ ok: false, text: err.message }); }
+        setBusy(null);
     };
 
     const venmoLink = (bill) => {
@@ -74,6 +91,33 @@ export default function MyBillPage() {
                         </p>
                     </Card>
 
+                    {!data.isAdmin && (
+                        <Card>
+                            <form onSubmit={redeem} className="flex items-center gap-2 flex-wrap">
+                                <Ticket className="w-5 h-5 text-[#760296]" />
+                                <label htmlFor="coupon" className="text-sm font-medium">Have a coupon code?</label>
+                                <input id="coupon" value={code} onChange={(e) => setCode(e.target.value.toUpperCase())} placeholder="CODE"
+                                    className="flex-1 min-w-[120px] px-3 py-2 rounded-lg bg-slate-100 dark:bg-slate-800 text-sm uppercase tracking-wide" />
+                                <button type="submit" disabled={busy === "coupon" || !code.trim()}
+                                    className="px-4 py-2 rounded-lg bg-[#760296] hover:bg-[#5e0278] text-white text-sm font-semibold disabled:opacity-60">
+                                    {busy === "coupon" ? "Checking…" : "Apply"}
+                                </button>
+                            </form>
+                            {couponMsg && <p className={`mt-2 text-sm ${couponMsg.ok ? "text-emerald-700 dark:text-emerald-400" : "text-rose-600 dark:text-rose-400"}`}>{couponMsg.text}</p>}
+                            {(data.discounts || []).length > 0 && (
+                                <ul className="mt-3 text-sm space-y-1">
+                                    {data.discounts.map((d, i) => (
+                                        <li key={i} className="text-slate-600 dark:text-slate-300">
+                                            <span className="font-medium text-emerald-700 dark:text-emerald-400">{d.label}</span>
+                                            {" — "}{d.until ? (d.from === d.until ? monthName(d.from) : `${monthName(d.from)} – ${monthName(d.until)}`) : `from ${monthName(d.from)}, every month`}
+                                            {!d.activeNow && " (starts later)"}
+                                        </li>
+                                    ))}
+                                </ul>
+                            )}
+                        </Card>
+                    )}
+
                     {data.bills.length === 0 && <Card>No usage yet — nothing owed.</Card>}
 
                     {data.bills.map((bill) => (
@@ -87,6 +131,12 @@ export default function MyBillPage() {
                                     <dl className="mt-2 grid grid-cols-[auto_auto] gap-x-6 gap-y-1 text-sm">
                                         {!bill.isOwner && <><dt className="text-slate-500">Base fee</dt><dd className="text-right tabular-nums">{money(bill.baseFee)}</dd></>}
                                         <dt className="text-slate-500">AI grading ({bill.calls} AI requests)</dt><dd className="text-right tabular-nums">{money(bill.aiCost)}</dd>
+                                        {(bill.adjustments || []).map((l, i) => (
+                                            <div key={i} className="contents">
+                                                <dt className={l.amount < 0 ? "text-emerald-700 dark:text-emerald-400" : "text-slate-500"}>{l.label}{l.note ? ` — ${l.note}` : ""}</dt>
+                                                <dd className={`text-right tabular-nums ${l.amount < 0 ? "text-emerald-700 dark:text-emerald-400" : ""}`}>{l.amount < 0 ? `−${money(-l.amount)}` : `+${money(l.amount)}`}</dd>
+                                            </div>
+                                        ))}
                                         <dt className="font-semibold">{bill.isOwner ? "Your AI spending" : bill.isCurrent ? "So far" : "Total"}</dt><dd className="text-right font-semibold tabular-nums">{money(bill.total)}</dd>
                                     </dl>
                                     {bill.isOwner && <p className="mt-2 text-xs text-slate-500">You're the owner, so this isn't billed. It's what your own grading cost.</p>}

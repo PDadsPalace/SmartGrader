@@ -38,7 +38,7 @@ export async function POST(request) {
                 unit_amount: Math.round(charge * 100),
                 product_data: {
                     name: `SmartGrAIder — ${monthLabel(month)}`,
-                    description: `Base fee $${bill.baseFee.toFixed(2)} + AI grading $${bill.aiCost.toFixed(2)}`
+                    description: [`Base fee $${bill.baseFee.toFixed(2)}`, `AI grading $${bill.aiCost.toFixed(2)}`, ...bill.adjustments.map((l) => `${l.label} ${l.amount < 0 ? "-" : "+"}$${Math.abs(l.amount).toFixed(2)}`)].join(" · ")
                         + (charge > bill.total ? ` + card fee $${(charge - bill.total).toFixed(2)}` : ""),
                 },
             },

@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useSession, signIn } from "next-auth/react";
 import { Plus, Trash2, Save, AlertTriangle } from "lucide-react";
 import { BillingShell, Card, StatusPill, money, monthName } from "@/components/BillingShell";
+import { AdjustmentsCard, CouponsCard } from "@/components/BillingAdminExtras";
 
 function Stat({ label, value, sub }) {
     return (
@@ -22,6 +23,7 @@ export default function AdminBillingPage() {
     const [settings, setSettings] = useState(null);
     const [error, setError] = useState(null);
     const [saved, setSaved] = useState(false);
+    const [adjustFor, setAdjustFor] = useState("");
 
     const load = async (m = month) => {
         setError(null);
@@ -127,22 +129,30 @@ export default function AdminBillingPage() {
                                 <th className="p-3 text-right">AI requests</th>
                                 <th className="p-3 text-right">AI cost</th>
                                 <th className="p-3 text-right">Base fee</th>
+                                <th className="p-3 text-right">Adjust.</th>
                                 <th className="p-3 text-right">Total</th>
                                 <th className="p-3">Status</th>
                                 <th className="p-3"></th>
                             </tr>
                         </thead>
                         <tbody>
-                            {data.bills.length === 0 && <tr><td colSpan={7} className="p-4 text-slate-500">No usage this month.</td></tr>}
+                            {data.bills.length === 0 && <tr><td colSpan={8} className="p-4 text-slate-500">No usage this month.</td></tr>}
                             {data.bills.map((b) => (
                                 <tr key={b.email} className="border-b last:border-0 border-slate-100 dark:border-slate-800">
                                     <td className="p-3 font-medium">{b.email}</td>
                                     <td className="p-3 text-right tabular-nums">{b.calls}</td>
                                     <td className="p-3 text-right tabular-nums" title={`$${b.aiCostExact.toFixed(4)} · ${b.inputTokens.toLocaleString()} in / ${b.outputTokens.toLocaleString()} out tokens`}>{money(b.aiCost)}</td>
                                     <td className="p-3 text-right tabular-nums">{b.isOwner ? "—" : money(b.baseFee)}</td>
+                                    <td className="p-3 text-right tabular-nums" title={(b.adjustments || []).map((l) => `${l.label}: ${l.amount < 0 ? "-" : "+"}$${Math.abs(l.amount).toFixed(2)}`).join("\n")}>
+                                        {(b.adjustments || []).length === 0 ? "—" : (() => { const n = b.adjustments.reduce((t, l) => t + l.amount, 0); return n < 0 ? `−${money(-n)}` : `+${money(n)}`; })()}
+                                    </td>
                                     <td className="p-3 text-right tabular-nums font-semibold">{money(b.total)}</td>
                                     <td className="p-3"><StatusPill payment={b.payment} isCurrent={isCurrent} isOwner={b.isOwner} /></td>
-                                    <td className="p-3 text-right">
+                                    <td className="p-3 text-right whitespace-nowrap">
+                                        {!b.isOwner && (
+                                            <button onClick={() => { setAdjustFor(b.email); document.getElementById("adjust-card")?.scrollIntoView({ behavior: "smooth" }); }}
+                                                className="mr-3 text-xs font-medium text-slate-500 hover:text-[#760296] hover:underline">Adjust</button>
+                                        )}
                                         {!b.isOwner && !isCurrent && (
                                             <button onClick={() => togglePaid(b)} className="text-xs font-medium text-[#760296] dark:text-purple-300 hover:underline">
                                                 {b.payment?.status === "paid" ? "Mark unpaid" : "Mark paid (Venmo)"}
@@ -154,6 +164,13 @@ export default function AdminBillingPage() {
                         </tbody>
                     </table>
                 </Card>
+            )}
+
+            {data && !data.notConfigured && (
+                <div id="adjust-card" className="space-y-6">
+                    <AdjustmentsCard data={data} post={post} reload={() => load(month)} prefillEmail={adjustFor} onError={setError} />
+                    <CouponsCard data={data} post={post} reload={() => load(month)} onError={setError} />
+                </div>
             )}
 
             {settings && (
