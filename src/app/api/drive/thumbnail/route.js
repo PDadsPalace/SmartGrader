@@ -5,7 +5,7 @@ import { NextResponse } from "next/server";
 export async function GET(request) {
     const session = await getServerSession(authOptions);
 
-    if (!session || !session.accessToken) {
+    if (!session || !session.accessToken || session.error) {
         return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
@@ -23,6 +23,10 @@ export async function GET(request) {
                 Authorization: `Bearer ${session.accessToken}`,
             },
         });
+
+        if (response.status === 401) {
+            return NextResponse.json({ error: "Google sign-in expired", signInAgain: true }, { status: 401 });
+        }
 
         if (!response.ok) {
             throw new Error(`Failed to fetch thumbnail: ${response.status} ${response.statusText}`);

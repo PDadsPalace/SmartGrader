@@ -9,7 +9,7 @@ export const maxDuration = 30;
 // On-demand only (teacher clicks a button) so it never slows down grading.
 export async function GET(request) {
     const session = await getServerSession(authOptions);
-    if (!session || !session.accessToken) {
+    if (!session || !session.accessToken || session.error) {
         return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 

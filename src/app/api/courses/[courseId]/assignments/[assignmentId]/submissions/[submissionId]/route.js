@@ -6,11 +6,12 @@ import { getFileIntegrity } from "@/lib/driveIntegrity";
 import { textStats } from "@/lib/integrityAnalysis";
 import { extractGoogleFormResponse } from "@/lib/googleForms";
 import { NextResponse } from "next/server";
+import { isGoogleAuthError, SIGN_IN_AGAIN_MESSAGE } from "@/lib/googleAuthError";
 
 export async function GET(request, { params }) {
     const session = await getServerSession(authOptions);
 
-    if (!session || !session.accessToken) {
+    if (!session || !session.accessToken || session.error) {
         return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
@@ -173,6 +174,10 @@ export async function GET(request, { params }) {
 
     } catch (error) {
         console.error("API Route Error fetching specific submission:", error);
+
+        if (isGoogleAuthError(error)) {
+            return NextResponse.json({ error: SIGN_IN_AGAIN_MESSAGE, signInAgain: true }, { status: 401 });
+        }
 
         if (error.status === 403) {
             return NextResponse.json({ error: "Permission Denied. Did you grant Google Drive and Forms access when logging in?" }, { status: 403 });
