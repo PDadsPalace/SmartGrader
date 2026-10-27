@@ -8,6 +8,7 @@ import Papa from "papaparse";
 import stringSimilarity from "string-similarity";
 import { analyzeSubmissionIntegrity, analyzeClassIntegrity, topSeverity } from "@/lib/integrityAnalysis";
 import IntegrityPanel, { IntegrityBadge } from "@/components/IntegrityPanel";
+import { parseTrapWords, findTrapWords, trapWordFlag, applyTrapPenalty, TRAP_FAIL_MIN } from "@/lib/trapWords";
 
 import pkg from "../../../../../../package.json";
 import { parseGoogleFormCSV } from "@/lib/formCsvParser";
@@ -34,6 +35,11 @@ export default function GradingWorkspace() {
     const [studentGradeFloor, setStudentGradeFloor] = useState("");
     const [enableGlobalFloor, setEnableGlobalFloor] = useState(false);
     const [globalFloor, setGlobalFloor] = useState("50");
+    // Trap words (per assignment): 2+ found in a submission = Lens copy → grade 0
+    const [trapWordsInput, setTrapWordsInput] = useState("");
+    const trapWords = parseTrapWords(trapWordsInput);
+    const trapWordsRef = useRef(trapWords);
+    trapWordsRef.current = trapWords;
     const [rubricFile, setRubricFile] = useState(null);
 
     // Active Submission Data
@@ -203,6 +209,18 @@ export default function GradingWorkspace() {
     // Integrity Check: paste/speed/owner/Lens checks per student + shared-mistake
     // checks across the class. Pure in-browser math on data we already fetched,
     // so it takes milliseconds and never slows grading down.
+    // Trap words found in a student's (text) submission. Reads the ref so async
+    // grading callbacks always use the current list.
+    const trapHitsFor = (subId) => {
+        const words = trapWordsRef.current;
+        if (!words || words.length === 0) return [];
+        const c = submissionCacheRef.current[subId];
+        if (!c) return [];
+        // Single image/PDF submissions hold base64 in .data — nothing to search.
+        if (c.isBinary && !(c.multipleBinaries && c.multipleBinaries.length)) return [];
+        return findTrapWords(c.data || c.content || "", words);
+    };
+
     const runSimilarityCheck = (subList = submissions) => {
         try {
             const roster = subList.map(sub => ({
@@ -227,6 +245,10 @@ export default function GradingWorkspace() {
                     });
                     if (own.length) newFlags[sub.id] = own;
                 }
+
+                // 1b. Trap words (Google Lens copy of a test sheet)
+                const trapFlag = trapWordFlag(trapHitsFor(sub.id));
+                if (trapFlag) newFlags[sub.id] = [trapFlag, ...(newFlags[sub.id] || [])];
 
                 // 2. Collect text + image fingerprints for the class-wide comparison
                 let text = cached.data || cached.content || "";
@@ -259,6 +281,11 @@ export default function GradingWorkspace() {
             console.error("Integrity check failed:", err);
         }
     };
+
+    useEffect(() => {
+        if (submissions.length) runSimilarityCheck(submissions);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [trapWordsInput]);
 
     // Load every student's file (without grading) and run the Integrity Check.
     const handleScanIntegrity = async () => {
@@ -398,6 +425,8 @@ export default function GradingWorkspace() {
 
             const savedGlobalFloor = localStorage.getItem(`globalFloor_${assignmentName}`);
             if (savedGlobalFloor) setGlobalFloor(savedGlobalFloor);
+
+            setTrapWordsInput(localStorage.getItem(`trapWords_${assignmentName}`) || "");
             
             const savedPrivacyMode = localStorage.getItem('privacyMode');
             if (savedPrivacyMode) setPrivacyMode(savedPrivacyMode === 'true');
@@ -466,6 +495,17 @@ export default function GradingWorkspace() {
         localStorage.setItem('privacyMode', privacyMode);
         localStorage.setItem('pref_generateFeedback', String(generateFeedback));
     }, [rubric, strictness, rubricFile, bypassMissingWork, missingWorkGrade, applyLatePenalty, latePenalty, enableGlobalFloor, globalFloor, assignmentName, privacyMode, generateFeedback]);
+
+    // Save trap words per assignment
+    const trapWordsLoadedFor = useRef(null);
+    useEffect(() => {
+        if (!assignmentName) return;
+        if (trapWordsLoadedFor.current !== assignmentName) {
+            trapWordsLoadedFor.current = assignmentName; // skip the first run so we don't overwrite the saved list
+            return;
+        }
+        localStorage.setItem(`trapWords_${assignmentName}`, trapWordsInput);
+    }, [trapWordsInput, assignmentName]);
 
     // Save batchResults when they change
     useEffect(() => {
@@ -792,11 +832,11 @@ export default function GradingWorkspace() {
             let rawGrade = String(data.grade || "N/A");
             let finalGradeCalculated = rawGrade.replace(/[^\d.]/g, '').trim() || rawGrade;
 
-            const newResultObj = {
+            const newResultObj = applyTrapPenalty({
                 grade: finalGradeCalculated,
                 feedback: data.feedback || "Re-graded after rule update.",
                 confidence: data.confidence || "high"
-            };
+            }, trapHitsFor(selectedSubmission.id));
 
             setAiFeedback(newResultObj);
             setBatchResults(prev => ({
@@ -1260,20 +1300,16 @@ export default function GradingWorkspace() {
                 }
             }
 
-            setAiFeedback({
+            const singleResult = applyTrapPenalty({
                 grade: finalGradeCalculated,
                 feedback: data.feedback || "No feedback returned.",
                 confidence: data.confidence || "high"
+            }, trapHitsFor(selectedSubmission.id));
+            setAiFeedback(singleResult);
+            setBatchResults(prev => {
+                const { originalGrade, trapWords: _tw, ...rest } = prev[selectedSubmission.id] || {};
+                return { ...prev, [selectedSubmission.id]: { ...rest, ...singleResult } };
             });
-            setBatchResults(prev => ({
-                ...prev,
-                [selectedSubmission.id]: {
-                    ...prev[selectedSubmission.id],
-                    grade: finalGradeCalculated,
-                    feedback: data.feedback || "No feedback returned.",
-                    confidence: data.confidence || "high"
-                }
-            }));
         } catch (err) {
             console.error("AI Grading Error:", err);
             setError(err.message || "An error occurred while calling the AI. Did you add the GEMINI_API_KEY to your .env.local?");
@@ -1945,11 +1981,11 @@ export default function GradingWorkspace() {
                             }
                         }
 
-                        const resultObj = {
+                        const resultObj = applyTrapPenalty({
                             grade: finalGradeCalculated,
                             feedback: gradeData.feedback || "No feedback returned.",
                             confidence: gradeData.confidence || "high"
-                        };
+                        }, trapHitsFor(sub.id));
                         setBatchResults(prev => ({ ...prev, [sub.id]: resultObj }));
 
                         if (selectedSubmission && selectedSubmission.id === sub.id) {
@@ -2809,6 +2845,19 @@ export default function GradingWorkspace() {
                                                             placeholder="50"
                                                         />
                                                     )}
+                                                </div>
+
+                                                <div className="flex gap-1.5 items-center" title={`Small gray words students were told to skip. ${TRAP_FAIL_MIN}+ in a submission = copied with Google Lens → grade 0 (you can change it). 1 = warning only.`}>
+                                                    <span className={`flex items-center gap-1 text-xs font-bold px-3 py-1.5 rounded-lg border ${trapWords.length ? 'bg-rose-100 border-rose-300 text-rose-800 dark:bg-rose-900/60 dark:border-rose-700 dark:text-rose-300' : 'bg-slate-50 border-slate-200 text-slate-600 dark:bg-slate-900/40 dark:border-slate-800 dark:text-slate-400'}`}>
+                                                        🪤 Trap Words{trapWords.length ? ` (${trapWords.length})` : ""}
+                                                    </span>
+                                                    <input
+                                                        type="text"
+                                                        value={trapWordsInput}
+                                                        onChange={(e) => setTrapWordsInput(e.target.value)}
+                                                        placeholder="walrus, pancake, volcano…"
+                                                        className="w-56 p-1 px-2 text-sm border border-rose-200 dark:border-rose-800 rounded-md focus:ring-2 focus:ring-rose-500 outline-none bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100"
+                                                    />
                                                 </div>
                                             </div>
                                         </div>

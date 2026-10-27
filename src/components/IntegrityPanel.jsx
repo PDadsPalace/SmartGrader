@@ -232,7 +232,7 @@ export default function IntegrityPanel({ flags = [], integrity, nameFor, onOpenS
                     )}
 
                     <p className="text-[11px] text-slate-500 dark:text-slate-400 italic">
-                        These are clues, not proof, and they never change the grade. Check Version History before talking with a student.
+                        {flags.some(f => f.type === "trapWords" && f.severity === "high") ? "Trap words set this grade to 0 — you can change it. Other flags are clues, not proof." : "These are clues, not proof, and they never change the grade."} Check Version History before talking with a student.
                     </p>
                 </div>
             )}
