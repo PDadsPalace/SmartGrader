@@ -394,6 +394,13 @@ export default function Home() {
             </div>
           </div>
           <a
+            href="/video-scores"
+            className="w-full flex items-center gap-2 px-3 py-2 text-sm font-medium text-slate-600 dark:text-slate-300 hover:text-[#760296] hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors mb-1"
+          >
+            <PlayCircle className="w-4 h-4" />
+            Video Scores
+          </a>
+          <a
             href="/billing"
             className="w-full flex items-center gap-2 px-3 py-2 text-sm font-medium text-slate-600 dark:text-slate-300 hover:text-[#760296] hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors mb-1"
           >
