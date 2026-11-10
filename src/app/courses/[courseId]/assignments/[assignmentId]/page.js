@@ -3,7 +3,7 @@
 import { useSession } from "next-auth/react";
 import { useEffect, useState, useRef } from "react";
 import { usePathname, useRouter } from "next/navigation";
-import { ArrowLeft, User, FileText, Settings2, Sparkles, CheckCircle2, ListChecks, Download, RefreshCw, X, AlertTriangle, UploadCloud, Zap, ZoomIn, ExternalLink, Eye, Maximize2, Minimize2, Plus, Minus, Image, Layers, HelpCircle, MessageSquare, Trash2, Edit2, ChevronDown, ChevronUp, Check, Brain } from "lucide-react";
+import { ArrowLeft, User, FileText, Settings2, Sparkles, CheckCircle2, ListChecks, Download, RefreshCw, X, AlertTriangle, UploadCloud, Zap, ZoomIn, ExternalLink, Eye, Maximize2, Minimize2, Plus, Minus, Image, Layers, HelpCircle, MessageSquare, Trash2, Edit2, ChevronDown, ChevronUp, Check, Brain, ClipboardPaste } from "lucide-react";
 import Papa from "papaparse";
 import stringSimilarity from "string-similarity";
 import { analyzeSubmissionIntegrity, analyzeClassIntegrity, topSeverity } from "@/lib/integrityAnalysis";
@@ -12,6 +12,7 @@ import { parseTrapWords, findTrapWords, trapWordFlag, applyTrapPenalty, TRAP_FAI
 
 import pkg from "../../../../../../package.json";
 import { parseGoogleFormCSV } from "@/lib/formCsvParser";
+import VideoScoresPaste from "@/components/VideoScoresPaste";
 
 export default function GradingWorkspace() {
     const { data: session, status } = useSession();
@@ -183,6 +184,7 @@ export default function GradingWorkspace() {
     const [batchGrading, setBatchGrading] = useState(false);
     const [batchProgress, setBatchProgress] = useState({ current: 0, total: 0 });
     const [batchResults, setBatchResults] = useState({}); // { [submissionId]: { grade, feedback } }
+    const [showVideoPaste, setShowVideoPaste] = useState(false);
     const stopGradingRef = useRef(false);
 
     // Sidebar student card DOM refs for auto-scrolling
@@ -2238,6 +2240,15 @@ export default function GradingWorkspace() {
                                     <X className="w-3.5 h-3.5" /> Clear All Grades
                                 </button>
                             )}
+                            {submissions.length > 0 && (
+                                <button
+                                    onClick={() => setShowVideoPaste(true)}
+                                    className="text-xs bg-red-50 dark:bg-red-900/40 text-red-700 dark:text-red-300 hover:bg-red-100 px-3 py-2 rounded-lg font-bold flex items-center gap-1.5 transition-colors h-8 whitespace-nowrap"
+                                    title="Paste scores from a Classroom YouTube video's Class insights"
+                                >
+                                    <ClipboardPaste className="w-3.5 h-3.5" /> Paste Video Scores
+                                </button>
+                            )}
                             {rosterMap && (
                                 <button
                                     onClick={() => {
@@ -3175,6 +3186,14 @@ export default function GradingWorkspace() {
             )}
 
             {/* PowerSchool Map Interceptor Modal */}
+            {showVideoPaste && (
+                <VideoScoresPaste
+                    submissions={submissions}
+                    maxPoints={assignmentInfo?.maxPoints || 100}
+                    onClose={() => setShowVideoPaste(false)}
+                    onApply={(results) => { setBatchResults((prev) => ({ ...prev, ...results })); setShowVideoPaste(false); }}
+                />
+            )}
             {showRosterModal && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm animate-in fade-in duration-200">
                     <div className="bg-white dark:bg-slate-950 rounded-2xl shadow-xl w-full max-w-md overflow-hidden animate-in zoom-in-95 duration-200">
