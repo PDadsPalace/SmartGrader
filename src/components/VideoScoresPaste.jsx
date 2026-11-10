@@ -9,7 +9,7 @@ import { parseInsightsHtml, parseInsightsText, scaled, matchToSubmissions } from
 export default function VideoScoresPaste({ submissions, maxPoints, onApply, onClose }) {
     const [rows, setRows] = useState(null);
     const [error, setError] = useState("");
-    const [skipZeros, setSkipZeros] = useState(true);
+    const [skipZeros, setSkipZeros] = useState(false);
 
     const onPaste = (e) => {
         e.preventDefault();
