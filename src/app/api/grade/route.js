@@ -23,7 +23,8 @@ export async function POST(request) {
         }
 
         const body = await request.json();
-        const { submissionText, rubric, strictness, studentId, studentNotes, rubricFile, studentFile, studentFiles, generateFeedback = false, maxPoints = 100, pastExemplars = [], learnedRules = [] } = body;
+        const { submissionText, rubric, strictness, studentId, studentNotes, rubricFile, studentFile, studentFiles, generateFeedback = false, maxPoints = 100, pastExemplars = [], learnedRules = [], assignmentInstructions = "", instructionsFile = null } = body;
+        const directions = String(assignmentInstructions || "").slice(0, 20000).trim();
 
         if (!submissionText) {
             return NextResponse.json({ error: "No submission text provided" }, { status: 400 });
@@ -53,7 +54,11 @@ export async function POST(request) {
         const systemInstruction = `
 You are an expert high school teacher grading an assignment. You will evaluate the student's submission based on the provided rubric.
 
-**TEACHER INSTRUCTIONS / RUBRIC:**
+${directions || instructionsFile ? `**ASSIGNMENT DIRECTIONS (what the students were told to do):**
+${directions || "(See the attached directions file.)"}
+Use these directions to understand what a complete submission must include. Check that the student did every required part. The rubric/answer key below decides the points.
+
+` : ""}**TEACHER INSTRUCTIONS / RUBRIC:**
 ${rubric || "No specific rubric provided. Evaluate for general high school level clarity, accuracy, and grammar."}
 ${learnedRulesSection}
 ${exemplarsSection}
@@ -137,6 +142,11 @@ CRITICAL REMINDER: Look closely at the student's file and text. If both are comp
         };
 
         let contentsData = [userPrompt];
+        if (instructionsFile && instructionsFile.data && isValidBase64Data(instructionsFile.data)) {
+            contentsData.push("The next file is the ASSIGNMENT DIRECTIONS given to students (NOT student work):");
+            contentsData.push({ inlineData: { data: instructionsFile.data.trim(), mimeType: sanitizeMimeType(instructionsFile.mimeType) } });
+            contentsData.push("The remaining file(s), if any, are the answer key and then the student's submission.");
+        }
         if (rubricFile && rubricFile.data && isValidBase64Data(rubricFile.data)) {
             contentsData.push({
                 inlineData: {

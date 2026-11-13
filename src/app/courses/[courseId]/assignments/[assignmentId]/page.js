@@ -185,6 +185,12 @@ export default function GradingWorkspace() {
     const [batchProgress, setBatchProgress] = useState({ current: 0, total: 0 });
     const [batchResults, setBatchResults] = useState({}); // { [submissionId]: { grade, feedback } }
     const [showVideoPaste, setShowVideoPaste] = useState(false);
+    // Assignment directions (what students were told to do) — sent to the AI with every grade
+    const [assignmentDirections, setAssignmentDirections] = useState("");
+    const [directionsFile, setDirectionsFile] = useState(null); // { data (base64), mimeType, name }
+    const [directionsStatus, setDirectionsStatus] = useState(""); // "loading" | message
+    const [directionsLoaded, setDirectionsLoaded] = useState(false);
+    const [showDirections, setShowDirections] = useState(true);
     const stopGradingRef = useRef(false);
 
     // Sidebar student card DOM refs for auto-scrolling
@@ -476,6 +482,63 @@ export default function GradingWorkspace() {
             }
         }
     }, [assignmentName]);
+
+    // Assignment directions: load saved copy, otherwise pull them from Classroom once
+    const loadDirectionsFromClassroom = async (replace = true) => {
+        setDirectionsStatus("loading");
+        try {
+            const res = await fetch(`/api/courses/${courseId}/assignments/${assignmentId}/directions`, { cache: "no-store" });
+            const json = await res.json();
+            if (!res.ok) throw new Error(json.error || "Couldn't load directions.");
+            if (!json.text && !json.file) { setDirectionsStatus("This assignment has no directions in Classroom. Type or paste them below, or attach a file."); return; }
+            if (replace) setAssignmentDirections(json.text || "");
+            if (json.file) setDirectionsFile(json.file);
+            setDirectionsStatus(json.sources?.length ? `Loaded from Classroom (${["description", ...json.sources].filter((x, i) => i > 0 || json.hasDescription).join(", ")}).` : "Loaded from Classroom.");
+        } catch (e) { setDirectionsStatus(e.message); }
+    };
+
+    useEffect(() => {
+        if (!assignmentName || !courseId || !assignmentId || directionsLoaded) return;
+        setDirectionsLoaded(true);
+        let saved = null, savedFile = null;
+        try { saved = localStorage.getItem(`directions_${assignmentName}`); savedFile = JSON.parse(localStorage.getItem(`directionsFile_${assignmentName}`) || "null"); } catch { /* ignore */ }
+        if (saved !== null) {
+            setAssignmentDirections(saved);
+            if (savedFile) setDirectionsFile(savedFile);
+        } else {
+            loadDirectionsFromClassroom();
+        }
+    }, [assignmentName, courseId, assignmentId]);
+
+    useEffect(() => {
+        if (!assignmentName || !directionsLoaded) return;
+        try {
+            localStorage.setItem(`directions_${assignmentName}`, assignmentDirections);
+            if (directionsFile && directionsFile.data.length < 2_500_000) localStorage.setItem(`directionsFile_${assignmentName}`, JSON.stringify(directionsFile));
+            else localStorage.removeItem(`directionsFile_${assignmentName}`);
+        } catch { /* storage full — keep in memory only */ }
+    }, [assignmentDirections, directionsFile, assignmentName, directionsLoaded]);
+
+    const handleDirectionsFile = (e) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        if (file.type.startsWith("text/")) {
+            file.text().then((t) => setAssignmentDirections((prev) => (prev ? prev + "\n\n" : "") + t.slice(0, 20000)));
+            return;
+        }
+        const reader = new FileReader();
+        reader.onloadend = () => {
+            const data = String(reader.result).split(",")[1] || "";
+            setDirectionsFile({ data, mimeType: file.type || "application/pdf", name: file.name });
+        };
+        reader.readAsDataURL(file);
+        e.target.value = "";
+    };
+
+    const directionsPayload = () => ({
+        assignmentInstructions: assignmentDirections,
+        instructionsFile: directionsFile ? { data: directionsFile.data, mimeType: directionsFile.mimeType } : null,
+    });
 
     // Save rubric/strictness/file/feedback settings when they change
     useEffect(() => {
@@ -824,7 +887,8 @@ export default function GradingWorkspace() {
                     generateFeedback: generateFeedback,
                     maxPoints: assignmentInfo?.maxPoints || 100,
                     pastExemplars: pastExemplars,
-                    learnedRules: updatedRules
+                    learnedRules: updatedRules,
+                    ...directionsPayload()
                 })
             });
 
@@ -1243,7 +1307,8 @@ export default function GradingWorkspace() {
                     generateFeedback: generateFeedback,
                     maxPoints: assignmentInfo?.maxPoints || 100,
                     pastExemplars: pastExemplars,
-                    learnedRules: learnedRules
+                    learnedRules: learnedRules,
+                    ...directionsPayload()
                 })
             });
 
@@ -1516,7 +1581,7 @@ export default function GradingWorkspace() {
         if (!assignmentName) return;
         setGeneratingRubric(true);
         try {
-            const prompt = `Generate a clear, 4-category grading rubric for a school assignment titled "${assignmentName}". Points possible: ${assignmentInfo?.maxPoints || 100}. Format as bullet points for each criteria band.`;
+            const prompt = `Generate a clear, 4-category grading rubric for a school assignment titled "${assignmentName}". Points possible: ${assignmentInfo?.maxPoints || 100}. Format as bullet points for each criteria band.${assignmentDirections ? `\n\nBase the rubric on these assignment directions given to students:\n${assignmentDirections.slice(0, 8000)}` : ""}`;
             const res = await fetch('/api/grade', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -1909,7 +1974,8 @@ export default function GradingWorkspace() {
                                 generateFeedback: generateFeedback,
                                 maxPoints: assignmentInfo?.maxPoints || 100,
                                 pastExemplars: pastExemplars,
-                                learnedRules: learnedRules
+                                learnedRules: learnedRules,
+                                ...directionsPayload()
                             })
                         });
                         
@@ -2771,6 +2837,45 @@ export default function GradingWorkspace() {
                                                     </button>
                                                 </div>
                                             </div>
+                                        )}
+                                    </div>
+
+                                    <div>
+                                        <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
+                                            <button type="button" onClick={() => setShowDirections((v) => !v)} className="flex items-center gap-1.5 text-sm font-semibold text-slate-700 dark:text-slate-300">
+                                                {showDirections ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                                                Assignment Directions
+                                                {(assignmentDirections || directionsFile) && <span className="text-xs font-bold text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/40 px-2 py-0.5 rounded">AI uses these</span>}
+                                            </button>
+                                            <div className="flex items-center gap-2">
+                                                <button type="button" onClick={() => loadDirectionsFromClassroom(true)} disabled={directionsStatus === "loading"}
+                                                    className="text-xs bg-emerald-50 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-100 border border-emerald-200 dark:border-emerald-800 px-2.5 py-1 rounded-lg font-bold flex items-center gap-1 disabled:opacity-60">
+                                                    <RefreshCw className={`w-3.5 h-3.5 ${directionsStatus === "loading" ? "animate-spin" : ""}`} />Load from Classroom
+                                                </button>
+                                                <label className="relative text-xs bg-white dark:bg-slate-800 hover:bg-slate-100 border border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-300 px-2.5 py-1 rounded-lg font-bold flex items-center gap-1 cursor-pointer">
+                                                    <UploadCloud className="w-3.5 h-3.5 text-indigo-500" />Attach file
+                                                    <input type="file" accept=".pdf,image/*,.txt" onChange={handleDirectionsFile} className="absolute inset-0 opacity-0 cursor-pointer" />
+                                                </label>
+                                            </div>
+                                        </div>
+                                        {showDirections && (
+                                            <>
+                                                <textarea
+                                                    value={assignmentDirections}
+                                                    onChange={(e) => setAssignmentDirections(e.target.value)}
+                                                    placeholder="What were students asked to do? Paste the directions here, or click Load from Classroom. The AI reads these with your rubric when it grades."
+                                                    className="w-full h-28 p-3 text-sm border border-slate-200 dark:border-slate-800 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none resize-y text-slate-800 dark:text-slate-200 placeholder:text-slate-400 bg-white dark:bg-slate-950"
+                                                ></textarea>
+                                                <div className="flex flex-wrap items-center gap-2 mt-1 text-xs text-slate-500">
+                                                    {directionsFile && (
+                                                        <span className="flex items-center gap-1 bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded-lg">
+                                                            <FileText className="w-3.5 h-3.5" />{directionsFile.name}
+                                                            <button type="button" onClick={() => setDirectionsFile(null)} className="ml-1 text-slate-400 hover:text-red-600" aria-label="Remove directions file"><X className="w-3.5 h-3.5" /></button>
+                                                        </span>
+                                                    )}
+                                                    {directionsStatus && directionsStatus !== "loading" && <span>{directionsStatus}</span>}
+                                                </div>
+                                            </>
                                         )}
                                     </div>
 
