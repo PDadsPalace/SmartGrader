@@ -1583,16 +1583,21 @@ export default function GradingWorkspace() {
             return;
         }
 
-        let csvContent = "data:text/csv;charset=utf-8,";
+        // Built as plain text and downloaded as a file (Blob). The old data: URL cut the file off
+        // at any "#" in the assignment name (e.g. "PBL Summative #2"), so no scores came out.
+        let csvContent = "";
+        const csvCell = (v) => { const t = String(v ?? ""); return /[",\n]/.test(t) ? `"${t.replace(/"/g, '""')}"` : t; };
+        const skipped = [];
+        let exported = 0;
 
         // 1. Build PowerSchool Header
         const dueDate = assignmentInfo?.dueDate ? `${assignmentInfo.dueDate.year}-${String(assignmentInfo.dueDate.month).padStart(2, '0')}-${String(assignmentInfo.dueDate.day).padStart(2, '0')}` : "";
         const maxPoints = assignmentInfo?.maxPoints ? `${assignmentInfo.maxPoints}.0` : "100.0";
 
         // PowerSchool requires exactly this structure with exact precision
-        csvContent += `Teacher Name:,${rosterMap.teacherName},\n`;
-        csvContent += `Class:,${rosterMap.className},\n`;
-        csvContent += `Assignment Name:,${assignmentName},\n`;
+        csvContent += `Teacher Name:,${csvCell(rosterMap.teacherName)},\n`;
+        csvContent += `Class:,${csvCell(rosterMap.className)},\n`;
+        csvContent += `Assignment Name:,${csvCell(assignmentName)},\n`;
         csvContent += `Due Date:,${dueDate},\n`;
         csvContent += `Points Possible:,${maxPoints},\n`;
         csvContent += `Extra Points:,0.0,\n`;
@@ -1624,21 +1629,30 @@ export default function GradingWorkspace() {
             }
 
             // Only export if we matched them to a PowerSchool Student Num
-            if (studentNum && matchedName) {
-                const draftGrade = parseFloat(result.grade);
-                if (!isNaN(draftGrade)) {
-                    csvContent += `${studentNum},"${matchedName}",${draftGrade}\n`;
-                }
+            const draftGrade = parseFloat(result.grade);
+            if (studentNum && matchedName && !isNaN(draftGrade)) {
+                csvContent += `${studentNum},${csvCell(matchedName)},${draftGrade}\n`;
+                exported++;
+            } else {
+                skipped.push(`${gn} ${fn}`.trim() + (isNaN(draftGrade) ? " (no number grade)" : " (not found in PowerSchool roster)"));
             }
         });
 
-        const encodedUri = encodeURI(csvContent);
+        const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8" });
+        const url = URL.createObjectURL(blob);
         const link = document.createElement("a");
-        link.setAttribute("href", encodedUri);
-        link.setAttribute("download", `${assignmentName || 'Grading_Results'}_PowerSchool.csv`);
+        link.href = url;
+        link.download = `${(assignmentName || 'Grading_Results').replace(/[\\/:*?"<>|#]+/g, "-")}_PowerSchool.csv`;
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
+        setTimeout(() => URL.revokeObjectURL(url), 2000);
+
+        if (exported === 0) {
+            alert("No grades were exported. None of the graded students matched the PowerSchool roster saved for this class. Click \"Reset Gradebook Roster\" and upload this class's PowerSchool template again.");
+        } else if (skipped.length) {
+            alert(`Exported ${exported} grades.\n\nNot in the file (${skipped.length}):\n${skipped.join("\n")}`);
+        }
     };
 
     const handleRegradeAll = async () => {
