@@ -14,6 +14,30 @@ import pkg from "../../../../../../package.json";
 import { parseGoogleFormCSV } from "@/lib/formCsvParser";
 import VideoScoresPaste from "@/components/VideoScoresPaste";
 
+// localStorage is only ~5 MB. Big answer-key / directions files could fill it, and a failed save
+// used to crash the whole page ("This page couldn't load"). This never throws: when storage is full
+// it drops saved key/direction files from other assignments (largest first) and tries again.
+function safeSetItem(key, value) {
+    try { localStorage.setItem(key, value); return true; } catch { /* full or blocked */ }
+    try {
+        const suffix = key.slice(key.indexOf("_") + 1); // keep this assignment's own files
+        const big = Object.keys(localStorage)
+            .filter((k) => k !== key && (k.startsWith("rubricFile_") || k.startsWith("directionsFile_")) && !k.endsWith(`_${suffix}`))
+            .sort((a, b) => (localStorage.getItem(b)?.length || 0) - (localStorage.getItem(a)?.length || 0));
+        for (const k of big) {
+            localStorage.removeItem(k);
+            try { localStorage.setItem(key, value); return true; } catch { /* keep freeing */ }
+        }
+    } catch { /* ignore */ }
+    console.warn(`Couldn't save ${key} — browser storage is full.`);
+    return false;
+}
+
+function readImageFromClipboard(e) {
+    const item = [...(e.clipboardData?.items || [])].find((it) => it.kind === "file" && /^image\/|pdf$/.test(it.type));
+    return item ? item.getAsFile() : null;
+}
+
 export default function GradingWorkspace() {
     const { data: session, status } = useSession();
     const router = useRouter();
@@ -513,8 +537,8 @@ export default function GradingWorkspace() {
     useEffect(() => {
         if (!assignmentName || !directionsLoaded) return;
         try {
-            localStorage.setItem(`directions_${assignmentName}`, assignmentDirections);
-            if (directionsFile && directionsFile.data.length < 2_500_000) localStorage.setItem(`directionsFile_${assignmentName}`, JSON.stringify(directionsFile));
+            safeSetItem(`directions_${assignmentName}`, assignmentDirections);
+            if (directionsFile && directionsFile.data.length < 2_500_000) safeSetItem(`directionsFile_${assignmentName}`, JSON.stringify(directionsFile));
             else localStorage.removeItem(`directionsFile_${assignmentName}`);
         } catch { /* storage full — keep in memory only */ }
     }, [assignmentDirections, directionsFile, assignmentName, directionsLoaded]);
@@ -544,21 +568,21 @@ export default function GradingWorkspace() {
     useEffect(() => {
         if (assignmentName) {
             if (rubric !== "") {
-                localStorage.setItem(`rubric_${assignmentName}`, rubric);
+                safeSetItem(`rubric_${assignmentName}`, rubric);
             }
-            localStorage.setItem(`strictness_${assignmentName}`, strictness);
+            safeSetItem(`strictness_${assignmentName}`, strictness);
             if (rubricFile) {
-                localStorage.setItem(`rubricFile_${assignmentName}`, JSON.stringify(rubricFile));
+                safeSetItem(`rubricFile_${assignmentName}`, JSON.stringify(rubricFile));
             }
-            localStorage.setItem(`bypassMissing_${assignmentName}`, bypassMissingWork);
-            localStorage.setItem(`missingWorkGrade_${assignmentName}`, missingWorkGrade);
-            localStorage.setItem(`applyLatePenalty_${assignmentName}`, applyLatePenalty);
-            localStorage.setItem(`latePenalty_${assignmentName}`, latePenalty);
-            localStorage.setItem(`enableGlobalFloor_${assignmentName}`, enableGlobalFloor);
-            localStorage.setItem(`globalFloor_${assignmentName}`, globalFloor);
+            safeSetItem(`bypassMissing_${assignmentName}`, bypassMissingWork);
+            safeSetItem(`missingWorkGrade_${assignmentName}`, missingWorkGrade);
+            safeSetItem(`applyLatePenalty_${assignmentName}`, applyLatePenalty);
+            safeSetItem(`latePenalty_${assignmentName}`, latePenalty);
+            safeSetItem(`enableGlobalFloor_${assignmentName}`, enableGlobalFloor);
+            safeSetItem(`globalFloor_${assignmentName}`, globalFloor);
         }
-        localStorage.setItem('privacyMode', privacyMode);
-        localStorage.setItem('pref_generateFeedback', String(generateFeedback));
+        safeSetItem('privacyMode', privacyMode);
+        safeSetItem('pref_generateFeedback', String(generateFeedback));
     }, [rubric, strictness, rubricFile, bypassMissingWork, missingWorkGrade, applyLatePenalty, latePenalty, enableGlobalFloor, globalFloor, assignmentName, privacyMode, generateFeedback]);
 
     // Save trap words per assignment
@@ -569,13 +593,13 @@ export default function GradingWorkspace() {
             trapWordsLoadedFor.current = assignmentName; // skip the first run so we don't overwrite the saved list
             return;
         }
-        localStorage.setItem(`trapWords_${assignmentName}`, trapWordsInput);
+        safeSetItem(`trapWords_${assignmentName}`, trapWordsInput);
     }, [trapWordsInput, assignmentName]);
 
     // Save batchResults when they change
     useEffect(() => {
         if (assignmentId && courseId && Object.keys(batchResults).length > 0) {
-            localStorage.setItem(`grades_${courseId}_${assignmentId}`, JSON.stringify(batchResults));
+            safeSetItem(`grades_${courseId}_${assignmentId}`, JSON.stringify(batchResults));
         }
     }, [batchResults, courseId, assignmentId]);
 
@@ -615,7 +639,7 @@ export default function GradingWorkspace() {
                     
                     // If we found and fixed old dirty grades, re-save to localStorage
                     if (sanitized) {
-                        localStorage.setItem(`grades_${courseId}_${assignmentId}`, JSON.stringify(parsedGrades));
+                        safeSetItem(`grades_${courseId}_${assignmentId}`, JSON.stringify(parsedGrades));
                     }
                 } catch (e) {
                     console.error("Failed to parse saved grades", e);
@@ -637,6 +661,20 @@ export default function GradingWorkspace() {
             }
         }
     }, [courseId]);
+
+    const attachKeyFile = (file) => {
+        const reader = new FileReader();
+        reader.onloadend = () => setRubricFile({ base64: reader.result, mimeType: file.type, name: file.name || "Pasted answer key.png" });
+        reader.readAsDataURL(file);
+    };
+
+    // Paste into the Answer Key box: a screenshot/image becomes the attached key; text pastes as usual.
+    const handleKeyPaste = (e) => {
+        const file = readImageFromClipboard(e);
+        if (!file) return;
+        e.preventDefault();
+        attachKeyFile(file);
+    };
 
     const handleFileChange = (e) => {
         const file = e.target.files[0];
@@ -704,7 +742,7 @@ export default function GradingWorkspace() {
             timestamp: Date.now()
         });
         if (exemplars.length > 8) exemplars = exemplars.slice(0, 8);
-        localStorage.setItem(exemplarKey, JSON.stringify(exemplars));
+        safeSetItem(exemplarKey, JSON.stringify(exemplars));
         setPastExemplars(exemplars);
     };
 
@@ -713,7 +751,7 @@ export default function GradingWorkspace() {
         setLearnedRules(updated);
         if (assignmentName) {
             const rulesKey = `learned_rules_${assignmentName.toLowerCase().trim()}`;
-            localStorage.setItem(rulesKey, JSON.stringify(updated));
+            safeSetItem(rulesKey, JSON.stringify(updated));
         }
     };
 
@@ -785,7 +823,7 @@ export default function GradingWorkspace() {
             };
 
             if (carryKeyToAllClasses) {
-                localStorage.setItem(masterKeyStorageKey, JSON.stringify(masterKeyObj));
+                safeSetItem(masterKeyStorageKey, JSON.stringify(masterKeyObj));
                 setGlobalKeyActiveBanner(masterKeyObj);
             }
         }
@@ -971,7 +1009,7 @@ export default function GradingWorkspace() {
             }
         });
         setBatchResults(prev => ({ ...prev, ...results }));
-        localStorage.setItem(`grades_${courseId}_${assignmentId}`, JSON.stringify({ ...batchResults, ...results }));
+        safeSetItem(`grades_${courseId}_${assignmentId}`, JSON.stringify({ ...batchResults, ...results }));
         setImportedCount(count);
         // Show the first student's result immediately
         if (selectedSubmission && results[selectedSubmission.id]) {
@@ -1020,7 +1058,7 @@ export default function GradingWorkspace() {
                             setIsEdpuzzleMode(savedFlag === "true");
                         } else if (detectEdpuzzle(data.assignmentDetails, subs)) {
                             setIsEdpuzzleMode(true);
-                            localStorage.setItem(`edpuzzle_${courseId}_${assignmentId}`, "true");
+                            safeSetItem(`edpuzzle_${courseId}_${assignmentId}`, "true");
                         }
                     }
                     if (subs.length > 0) {
@@ -1422,7 +1460,7 @@ export default function GradingWorkspace() {
                     };
 
                     setRosterMap(mapObject);
-                    localStorage.setItem(`roster_map_${courseId}`, JSON.stringify(mapObject));
+                    safeSetItem(`roster_map_${courseId}`, JSON.stringify(mapObject));
                     setShowRosterModal(false);
                     setRosterSetupError("");
 
@@ -1544,7 +1582,7 @@ export default function GradingWorkspace() {
                 }
 
                 setBatchResults(prev => ({ ...prev, ...newResults }));
-                localStorage.setItem(`grades_${courseId}_${assignmentId}`, JSON.stringify({ ...batchResults, ...newResults }));
+                safeSetItem(`grades_${courseId}_${assignmentId}`, JSON.stringify({ ...batchResults, ...newResults }));
                 setImportedCount(count);
                 setShowEdpuzzleCsvModal(false);
                 setEdpuzzleCsvError("");
@@ -1571,7 +1609,7 @@ export default function GradingWorkspace() {
                 maxPoints: points || 100,
                 updatedAt: new Date().toISOString()
             });
-            localStorage.setItem('smartgrader_past_rubrics', JSON.stringify(history.slice(0, 25)));
+            safeSetItem('smartgrader_past_rubrics', JSON.stringify(history.slice(0, 25)));
         } catch (e) {
             console.error("Failed to save rubric history", e);
         }
@@ -2179,7 +2217,7 @@ export default function GradingWorkspace() {
         const sub = submissions.find(s => s.id === subId);
         if (!sub) return;
         setSelectedSubmission(sub);
-        localStorage.setItem(`last_student_${courseId}_${assignmentId}`, sub.id);
+        safeSetItem(`last_student_${courseId}_${assignmentId}`, sub.id);
         setAiFeedback(batchResults[sub.id] || null);
         setStudentNotes(localStorage.getItem(`student_notes_${sub.userId}`) || "");
         setStudentGradeFloor(localStorage.getItem(`student_floor_${sub.userId}`) || "");
@@ -2377,7 +2415,7 @@ export default function GradingWorkspace() {
                                     ref={(el) => { studentItemRefs.current[sub.id] = el; }}
                                     onClick={() => {
                                         setSelectedSubmission(sub);
-                                        localStorage.setItem(`last_student_${courseId}_${assignmentId}`, sub.id);
+                                        safeSetItem(`last_student_${courseId}_${assignmentId}`, sub.id);
                                         setAiFeedback(batchResults[sub.id] || null);
                                         const savedNotes = localStorage.getItem(`student_notes_${sub.userId}`);
                                         setStudentNotes(savedNotes || "");
@@ -2683,7 +2721,7 @@ export default function GradingWorkspace() {
                                         onClick={() => {
                                             const next = !isEdpuzzleMode;
                                             setIsEdpuzzleMode(next);
-                                            localStorage.setItem(`edpuzzle_${courseId}_${assignmentId}`, String(next));
+                                            safeSetItem(`edpuzzle_${courseId}_${assignmentId}`, String(next));
                                         }}
                                         className={`flex items-center gap-2 text-xs font-bold px-3 py-2 rounded-lg border transition-all ${
                                             isEdpuzzleMode
@@ -2724,7 +2762,7 @@ export default function GradingWorkspace() {
                                                     value={studentNotes}
                                                     onChange={(e) => {
                                                         setStudentNotes(e.target.value);
-                                                        localStorage.setItem(`student_notes_${selectedSubmission.userId}`, e.target.value);
+                                                        safeSetItem(`student_notes_${selectedSubmission.userId}`, e.target.value);
                                                     }}
                                                     placeholder="e.g. Needs easier grading because they are ELL..."
                                                     className="w-full h-20 p-3 text-sm border border-slate-200 dark:border-slate-800 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none resize-y bg-yellow-50/30 text-slate-800 dark:text-slate-200 placeholder:text-slate-400"
@@ -2737,7 +2775,7 @@ export default function GradingWorkspace() {
                                                     value={studentGradeFloor}
                                                     onChange={(e) => {
                                                         setStudentGradeFloor(e.target.value);
-                                                        localStorage.setItem(`student_floor_${selectedSubmission.userId}`, e.target.value);
+                                                        safeSetItem(`student_floor_${selectedSubmission.userId}`, e.target.value);
                                                     }}
                                                     placeholder="e.g. 50"
                                                     className="w-full h-20 p-3 text-center text-xl font-black border border-slate-200 dark:border-slate-800 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none bg-indigo-50/50 text-indigo-700 dark:text-indigo-400 placeholder:text-indigo-300 placeholder:font-normal placeholder:text-sm"
@@ -2863,6 +2901,14 @@ export default function GradingWorkspace() {
                                                 <textarea
                                                     value={assignmentDirections}
                                                     onChange={(e) => setAssignmentDirections(e.target.value)}
+                                                    onPaste={(e) => {
+                                                        const file = readImageFromClipboard(e);
+                                                        if (!file) return;
+                                                        e.preventDefault();
+                                                        const reader = new FileReader();
+                                                        reader.onloadend = () => setDirectionsFile({ data: String(reader.result).split(",")[1] || "", mimeType: file.type, name: file.name || "Pasted directions.png" });
+                                                        reader.readAsDataURL(file);
+                                                    }}
                                                     placeholder="What were students asked to do? Paste the directions here, or click Load from Classroom. The AI reads these with your rubric when it grades."
                                                     className="w-full h-28 p-3 text-sm border border-slate-200 dark:border-slate-800 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none resize-y text-slate-800 dark:text-slate-200 placeholder:text-slate-400 bg-white dark:bg-slate-950"
                                                 ></textarea>
@@ -3030,7 +3076,8 @@ export default function GradingWorkspace() {
                                         <textarea
                                             value={rubric}
                                             onChange={(e) => setRubric(e.target.value)}
-                                            placeholder={useStudentAsKey ? "e.g. Ignore minor spelling mistakes..." : "Paste the grading rubric or correct answers here..."}
+                                            onPaste={useStudentAsKey ? undefined : handleKeyPaste}
+                                            placeholder={useStudentAsKey ? "e.g. Ignore minor spelling mistakes..." : "Paste the answer key here (Ctrl+V). Text, or a screenshot/picture of the key, both work. You can also type the rubric or correct answers."}
                                             className="w-full h-32 p-3 text-sm border border-slate-200 dark:border-slate-800 rounded-xl rounded-b-none border-b-0 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none resize-y text-slate-800 dark:text-slate-200 placeholder:text-slate-400"
                                         ></textarea>
 
