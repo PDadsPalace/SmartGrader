@@ -1,4 +1,5 @@
 import { google } from "googleapis";
+import { workbookToText } from "./spreadsheetText";
 
 // Initialize the Google Drive client using an OAuth2 access token
 export function getDriveClient(accessToken) {
@@ -23,6 +24,34 @@ export async function exportGoogleDocToText(accessToken, fileId) {
 
         const mimeType = fileMeta.data.mimeType;
         let response;
+
+        // Spreadsheets (Google Sheets and uploaded Excel files): send the AI the cell values and formulas
+        // as text. A PDF picture of a sparse sheet often looked blank and got a 0.
+        const XLSX = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+        if (mimeType === 'application/vnd.google-apps.spreadsheet' || mimeType === XLSX) {
+            try {
+                const res = mimeType === XLSX
+                    ? await drive.files.get({ fileId, alt: 'media' }, { responseType: 'arraybuffer' })
+                    : await drive.files.export({ fileId, mimeType: XLSX }, { responseType: 'arraybuffer' });
+                const { text } = await workbookToText(Buffer.from(res.data));
+                // Also send the usual picture of a Google Sheet (as before), so the AI still sees
+                // formatting: bold headers, borders, colors, $ and % number formats, and how charts look.
+                let extraBinary = null;
+                if (mimeType !== XLSX) {
+                    try {
+                        const pdf = await drive.files.export({ fileId, mimeType: 'application/pdf' }, { responseType: 'arraybuffer' });
+                        const b64 = Buffer.from(pdf.data).toString('base64');
+                        if (b64.length < 2_000_000) extraBinary = { data: b64, mimeType: 'application/pdf' };
+                    } catch { /* picture is optional */ }
+                }
+                return { data: text, mimeType: 'text/plain', isBinary: false, extraBinary };
+            } catch (sheetErr) {
+                console.error(`Spreadsheet-to-text failed for ${fileId}, falling back to PDF:`, sheetErr.message);
+                if (mimeType === XLSX) {
+                    return { data: 'Fatal Error: This Excel file could not be read. Ask the student to open it in Google Sheets (File > Save as Google Sheets) and turn that in.', mimeType: 'text/plain', isBinary: false };
+                }
+            }
+        }
 
         // 2. Export if it's a Google Workspace Document, otherwise Download
         let finalMimeType = mimeType;

@@ -144,6 +144,11 @@ export async function GET(request, { params }) {
                     });
                 } else {
                     combinedText += `\n\n--- Attachment: ${att.driveFile.title || "File"} ---\n${exportData.data}`;
+                    // Spreadsheets also come with a picture (formatting/charts) when it fits
+                    if (exportData.extraBinary && totalBinaryChars + exportData.extraBinary.data.length <= BINARY_LIMIT) {
+                        totalBinaryChars += exportData.extraBinary.data.length;
+                        multipleBinaries.push({ ...exportData.extraBinary, title: `${att.driveFile.title || "Spreadsheet"} (picture)` });
+                    }
                 }
             }
         }

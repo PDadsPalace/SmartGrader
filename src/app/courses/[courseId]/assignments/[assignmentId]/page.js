@@ -1802,7 +1802,7 @@ export default function GradingWorkspace() {
                         }
                         let keyText = "";
                         if (docData.isBinary) {
-                            keyText = "See attached master student file.";
+                            keyText = (docData.data && !String(docData.data).startsWith("See attached")) ? docData.data + "\n\nSee attached master student file." : "See attached master student file.";
                         } else if (docData.data) {
                             keyText = docData.data;
                         } else if (docData.content) {
