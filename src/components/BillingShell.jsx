@@ -9,9 +9,10 @@ export function monthName(key) {
     return new Date(Date.UTC(y, m - 1, 15)).toLocaleString("en-US", { month: "long", year: "numeric", timeZone: "UTC" });
 }
 
-export function StatusPill({ payment, isCurrent, isOwner }) {
+export function StatusPill({ payment, isCurrent, isOwner, paidAmount = 0, balance }) {
     const base = "inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold";
     if (isOwner) return <span className={`${base} bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300`}>Owner</span>;
+    if (payment?.status === "paid" && balance > 0) return <span className={`${base} bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300`}>Paid {money(paidAmount)} · {money(balance)} more {isCurrent ? "so far" : "due"}</span>;
     if (payment?.status === "paid") return <span className={`${base} bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300`}>Paid{payment.method ? ` · ${payment.method}` : ""}</span>;
     if (payment?.status === "venmo-pending") return <span className={`${base} bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300`}>Venmo pending</span>;
     if (isCurrent) return <span className={`${base} bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300`}>In progress</span>;

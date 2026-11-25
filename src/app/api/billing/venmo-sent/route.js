@@ -13,7 +13,7 @@ export async function POST(request) {
     const data = await getMonth(month);
     const bill = data.bills.find((b) => b.email === email);
     if (!bill) return NextResponse.json({ error: "No bill for that month" }, { status: 404 });
-    if (bill.payment?.status === "paid") return NextResponse.json({ ok: true });
+    if (bill.balance <= 0) return NextResponse.json({ ok: true });
     await setPayment(month, email, { status: "venmo-pending", method: "venmo", amount: bill.total, reportedAt: new Date().toISOString() });
     return NextResponse.json({ ok: true });
 }

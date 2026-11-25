@@ -21,10 +21,10 @@ export async function POST(request) {
     const data = await getMonth(month);
     const bill = data.bills.find((b) => b.email === email);
     if (!bill) return NextResponse.json({ error: "No bill for that month." }, { status: 404 });
-    if (bill.payment?.status === "paid") return NextResponse.json({ error: "Already paid." }, { status: 400 });
-    if (bill.total < STRIPE_MINIMUM) return NextResponse.json({ error: `Card payments must be at least $${STRIPE_MINIMUM.toFixed(2)}.` }, { status: 400 });
+    if (bill.balance <= 0) return NextResponse.json({ error: "Already paid." }, { status: 400 });
+    if (bill.balance < STRIPE_MINIMUM) return NextResponse.json({ error: `Card payments must be at least $${STRIPE_MINIMUM.toFixed(2)}.` }, { status: 400 });
 
-    const charge = data.settings.passCardFeeToPayer ? withCardFee(bill.total) : bill.total;
+    const charge = data.settings.passCardFeeToPayer ? withCardFee(bill.balance) : bill.balance;
     const origin = new URL(request.url).origin;
     const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 
@@ -39,7 +39,8 @@ export async function POST(request) {
                 product_data: {
                     name: `SmartGrAIder — ${monthLabel(month)}`,
                     description: [`Base fee $${bill.baseFee.toFixed(2)}`, `AI grading $${bill.aiCost.toFixed(2)}`, ...bill.adjustments.map((l) => `${l.label} ${l.amount < 0 ? "-" : "+"}$${Math.abs(l.amount).toFixed(2)}`)].join(" · ")
-                        + (charge > bill.total ? ` + card fee $${(charge - bill.total).toFixed(2)}` : ""),
+                        + (bill.paidAmount > 0 ? ` − already paid $${bill.paidAmount.toFixed(2)}` : "")
+                        + (charge > bill.balance ? ` + card fee $${(charge - bill.balance).toFixed(2)}` : ""),
                 },
             },
         }],

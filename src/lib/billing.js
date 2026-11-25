@@ -207,7 +207,7 @@ export async function getMyBills(rawEmail, monthsBack = 7) {
     const bills = results.map((r) => {
         const bill = r.bills.find((b) => b.email === email);
         if (!bill) return null;
-        const cardAmount = settings.passCardFeeToPayer && bill.total > 0 ? withCardFee(bill.total) : bill.total;
+        const cardAmount = settings.passCardFeeToPayer && bill.balance > 0 ? withCardFee(bill.balance) : bill.balance;
         return {
             month: r.month,
             isCurrent: r.month === current,
@@ -218,7 +218,9 @@ export async function getMyBills(rawEmail, monthsBack = 7) {
             adjustments: bill.adjustments.map(({ label, amount, note }) => ({ label, amount, note })),
             total: bill.total,
             cardAmount,
-            canPayByCard: bill.total >= STRIPE_MINIMUM && Boolean(process.env.STRIPE_SECRET_KEY),
+            canPayByCard: bill.balance >= STRIPE_MINIMUM && Boolean(process.env.STRIPE_SECRET_KEY),
+            paidAmount: bill.paidAmount,
+            balance: bill.balance,
             payment: bill.payment,
             isOwner: bill.isOwner,
         };

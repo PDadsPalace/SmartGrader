@@ -175,6 +175,11 @@ export function computeBills(usageRows, settings, payments = {}, adjustments = [
         const fee = isOwner || !used ? 0 : baseFee;
         const subtotal = roundCents(aiCost + fee);
         const applied = isOwner ? { lines: [], total: subtotal } : applyAdjustments({ baseFee: fee, aiCost }, adjFor(r.email));
+        const payment = payments[r.email] || null;
+        // A payment can be recorded any time in the month ("paid up to now"). amount = total paid so far for
+        // this month. If they use SmartGrader more afterwards, the new part shows as still due.
+        const paidAmount = payment?.status === "paid" ? roundCents(Number(payment.amount ?? applied.total) || 0) : 0;
+        const balance = isOwner ? 0 : roundCents(Math.max(0, applied.total - paidAmount));
         return {
             email: r.email,
             calls: r.calls || 0,
@@ -187,14 +192,16 @@ export function computeBills(usageRows, settings, payments = {}, adjustments = [
             adjustments: applied.lines,
             total: applied.total,
             isOwner,
-            payment: payments[r.email] || null,
+            payment,
+            paidAmount,
+            balance,
         };
     }).sort((a, b) => b.total - a.total);
 
     const aiTotal = active.reduce((s, r) => s + (r.costUsd || 0), 0);
     const others = bills.filter((b) => !b.isOwner);
     const owed = others.reduce((s, b) => s + b.total, 0);
-    const collected = others.filter((b) => b.payment?.status === "paid").reduce((s, b) => s + (b.payment.amount ?? b.total), 0);
+    const collected = others.reduce((s, b) => s + b.paidAmount, 0);
     const ownerAi = bills.filter((b) => b.isOwner).reduce((s, b) => s + b.aiCostExact, 0);
     const discounts = others.reduce((s, b) => s + b.adjustments.filter((l) => l.amount < 0).reduce((t, l) => t - l.amount, 0), 0);
     return {
@@ -227,14 +234,14 @@ export const REMINDER_WINDOW_DAYS = 7;
 export function reminderFor({ bills, currentMonth, daysLeft, lastDismissedAt, now = Date.now() }) {
     if (lastDismissedAt && now - new Date(lastDismissedAt).getTime() < REMINDER_EVERY_DAYS * 86400000) return null;
     const unpaid = bills.filter((b) => b.month < currentMonth && b.total > 0 && !b.isOwner
-        && b.payment?.status !== "paid" && b.payment?.status !== "venmo-pending");
+        && (b.balance ?? b.total) > 0 && b.payment?.status !== "venmo-pending");
     if (unpaid.length) {
-        const total = roundCents(unpaid.reduce((s, b) => s + b.total, 0));
+        const total = roundCents(unpaid.reduce((s, b) => s + (b.balance ?? b.total), 0));
         return { kind: "due", total, months: unpaid.map((b) => b.month).sort() };
     }
     const cur = bills.find((b) => b.month === currentMonth);
-    if (cur && !cur.isOwner && cur.total > 0 && daysLeft <= REMINDER_WINDOW_DAYS) {
-        return { kind: "upcoming", total: cur.total, months: [currentMonth], daysLeft, dueMonth: addMonths(currentMonth, 1) };
+    if (cur && !cur.isOwner && (cur.balance ?? cur.total) > 0 && daysLeft <= REMINDER_WINDOW_DAYS) {
+        return { kind: "upcoming", total: cur.balance ?? cur.total, months: [currentMonth], daysLeft, dueMonth: addMonths(currentMonth, 1) };
     }
     return null;
 }

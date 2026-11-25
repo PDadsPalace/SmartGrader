@@ -59,7 +59,7 @@ export default function MyBillPage() {
 
     const venmoLink = (bill) => {
         const note = encodeURIComponent(`SmartGrAIder ${monthName(bill.month)}`);
-        return `https://venmo.com/${data.venmoUsername}?txn=pay&amount=${bill.total.toFixed(2)}&note=${note}`;
+        return `https://venmo.com/${data.venmoUsername}?txn=pay&amount=${bill.balance.toFixed(2)}&note=${note}`;
     };
 
     const markVenmoSent = async (month) => {
@@ -126,7 +126,7 @@ export default function MyBillPage() {
                                 <div>
                                     <div className="flex items-center gap-2">
                                         <h2 className="text-lg font-bold">{monthName(bill.month)}</h2>
-                                        <StatusPill payment={bill.payment} isCurrent={bill.isCurrent} isOwner={bill.isOwner} />
+                                        <StatusPill payment={bill.payment} isCurrent={bill.isCurrent} isOwner={bill.isOwner} paidAmount={bill.paidAmount} balance={bill.balance} />
                                     </div>
                                     <dl className="mt-2 grid grid-cols-[auto_auto] gap-x-6 gap-y-1 text-sm">
                                         {!bill.isOwner && <><dt className="text-slate-500">Base fee</dt><dd className="text-right tabular-nums">{money(bill.baseFee)}</dd></>}
@@ -138,12 +138,18 @@ export default function MyBillPage() {
                                             </div>
                                         ))}
                                         <dt className="font-semibold">{bill.isOwner ? "Your AI spending" : bill.isCurrent ? "So far" : "Total"}</dt><dd className="text-right font-semibold tabular-nums">{money(bill.total)}</dd>
+                                        {!bill.isOwner && bill.paidAmount > 0 && (
+                                            <>
+                                                <dt className="text-emerald-700 dark:text-emerald-400">Paid</dt><dd className="text-right tabular-nums text-emerald-700 dark:text-emerald-400">−{money(bill.paidAmount)}</dd>
+                                                <dt className="font-semibold">{bill.isCurrent ? "New since you paid" : "Still due"}</dt><dd className="text-right font-semibold tabular-nums">{money(bill.balance)}</dd>
+                                            </>
+                                        )}
                                     </dl>
                                     {bill.isOwner && <p className="mt-2 text-xs text-slate-500">You're the owner, so this isn't billed. It's what your own grading cost.</p>}
                                     {bill.isCurrent && !bill.isOwner && <p className="mt-2 text-xs text-slate-500">This month is still running. You can pay once it ends.</p>}
                                 </div>
 
-                                {!bill.isCurrent && !bill.isOwner && bill.payment?.status !== "paid" && bill.total > 0 && (
+                                {!bill.isCurrent && !bill.isOwner && bill.balance > 0 && (
                                     <div className="flex flex-col gap-2 min-w-[200px]">
                                         {bill.canPayByCard && (
                                             <button onClick={() => payCard(bill.month)} disabled={!!busy}
@@ -155,7 +161,7 @@ export default function MyBillPage() {
                                             <>
                                                 <a href={venmoLink(bill)} target="_blank" rel="noopener noreferrer"
                                                     className="flex items-center justify-center gap-2 px-4 py-2 rounded-lg bg-[#008CFF] hover:bg-[#0074d4] text-white font-semibold">
-                                                    <Send className="w-4 h-4" />Pay {money(bill.total)} with Venmo
+                                                    <Send className="w-4 h-4" />Pay {money(bill.balance)} with Venmo
                                                 </a>
                                                 {bill.payment?.status !== "venmo-pending" && (
                                                     <button onClick={() => markVenmoSent(bill.month)} disabled={!!busy} className="text-xs text-slate-500 hover:text-[#760296] underline">
@@ -165,7 +171,7 @@ export default function MyBillPage() {
                                             </>
                                         )}
                                         {!bill.canPayByCard && !data.venmoUsername && <p className="text-sm text-slate-500">Payment options coming soon.</p>}
-                                        {!bill.canPayByCard && bill.total < 0.5 && data.venmoUsername && <p className="text-xs text-slate-500">Card payments need at least $0.50.</p>}
+                                        {!bill.canPayByCard && bill.balance < 0.5 && data.venmoUsername && <p className="text-xs text-slate-500">Card payments need at least $0.50.</p>}
                                     </div>
                                 )}
                             </div>

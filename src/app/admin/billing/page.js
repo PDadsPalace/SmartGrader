@@ -67,7 +67,7 @@ export default function AdminBillingPage() {
 
     const togglePaid = async (bill) => {
         try {
-            if (bill.payment?.status === "paid") {
+            if (bill.payment?.status === "paid" && bill.balance <= 0) {
                 if (!confirm(`Mark ${bill.email} as NOT paid for ${monthName(month)}?`)) return;
                 await post({ action: "markUnpaid", month, email: bill.email });
             } else {
@@ -147,15 +147,15 @@ export default function AdminBillingPage() {
                                         {(b.adjustments || []).length === 0 ? "—" : (() => { const n = b.adjustments.reduce((t, l) => t + l.amount, 0); return n < 0 ? `−${money(-n)}` : `+${money(n)}`; })()}
                                     </td>
                                     <td className="p-3 text-right tabular-nums font-semibold">{money(b.total)}</td>
-                                    <td className="p-3"><StatusPill payment={b.payment} isCurrent={isCurrent} isOwner={b.isOwner} /></td>
+                                    <td className="p-3"><StatusPill payment={b.payment} isCurrent={isCurrent} isOwner={b.isOwner} paidAmount={b.paidAmount} balance={b.balance} /></td>
                                     <td className="p-3 text-right whitespace-nowrap">
                                         {!b.isOwner && (
                                             <button onClick={() => { setAdjustFor(b.email); document.getElementById("adjust-card")?.scrollIntoView({ behavior: "smooth" }); }}
                                                 className="mr-3 text-xs font-medium text-slate-500 hover:text-[#760296] hover:underline">Adjust</button>
                                         )}
-                                        {!b.isOwner && !isCurrent && (
+                                        {!b.isOwner && (b.total > 0 || b.payment) && (
                                             <button onClick={() => togglePaid(b)} className="text-xs font-medium text-[#760296] dark:text-purple-300 hover:underline">
-                                                {b.payment?.status === "paid" ? "Mark unpaid" : "Mark paid (Venmo)"}
+                                                {b.payment?.status === "paid" && b.balance <= 0 ? "Mark unpaid" : `Mark paid (${money(b.balance)})`}
                                             </button>
                                         )}
                                     </td>
